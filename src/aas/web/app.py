@@ -60,12 +60,10 @@ from flask import (
 from flask_cors import CORS
 from dotenv import set_key as dotenv_set_key
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import recognition
-import capture
-import spreadsheet
-from config import (
+from aas.recognition import engine as recognition
+from aas.capture import capture
+from aas.attendance import spreadsheet
+from aas.core.config import (
     CAPTURED_FOLDER, PHOTO_FOLDER, ENCODINGS_FOLDER,
     RECOGNITION_TOLERANCE, RECOGNITION_SCALE, MAX_IN_TIME,
     VOICE_TRIGGER_PHRASE, IP_CAMERA_URL, WEBCAM_INDEX,
@@ -89,7 +87,7 @@ def create_app() -> Flask:
 
     def _is_authenticated() -> bool:
         try:
-            from oauth import is_authenticated
+            from aas.integrations.google.oauth import is_authenticated
             return is_authenticated() and session.get("user_email")
         except Exception:
             return False
@@ -105,7 +103,7 @@ def create_app() -> Flask:
             return False
 
     def _get_creds():
-        from oauth import get_credentials
+        from aas.integrations.google.oauth import get_credentials
         return get_credentials()
 
     def login_required(f):
@@ -202,7 +200,7 @@ def create_app() -> Flask:
     @app.route('/auth/google')
     def auth_google():
         try:
-            from oauth import create_oauth_flow
+            from aas.integrations.google.oauth import create_oauth_flow
             flow = create_oauth_flow()
             auth_url, state = flow.authorization_url(
                 access_type='offline',
@@ -217,7 +215,7 @@ def create_app() -> Flask:
     @app.route('/auth/google/callback')
     def auth_google_callback():
         try:
-            from oauth import create_oauth_flow, save_credentials_from_callback
+            from aas.integrations.google.oauth import create_oauth_flow, save_credentials_from_callback
             from googleapiclient.discovery import build
 
             flow = create_oauth_flow()
@@ -231,14 +229,14 @@ def create_app() -> Flask:
             name  = user_info.get('name', '')
 
             # Save token with user info
-            from oauth import _save_token
+            from aas.integrations.google.oauth import _save_token
             _save_token(creds, email=email, name=name)
 
             session['user_email'] = email
             session['user_name']  = name
 
             # Check if this is a new or returning user
-            from drive_manager import check_drive_setup_exists
+            from aas.integrations.google.drive_manager import check_drive_setup_exists
             if check_drive_setup_exists(creds):
                 return redirect('/dashboard')
             else:
@@ -250,7 +248,7 @@ def create_app() -> Flask:
 
     @app.route('/logout')
     def logout():
-        from oauth import revoke_token
+        from aas.integrations.google.oauth import revoke_token
         revoke_token()
         session.clear()
         return redirect('/login')
@@ -313,8 +311,8 @@ def create_app() -> Flask:
                 return jsonify({'status': 'error', 'message': 'No sections provided'}), 400
 
             creds = _get_creds()
-            from drive_manager import ensure_root_folder, ensure_section_folder, create_section_spreadsheet
-            from camera_registry import add_camera, update_camera
+            from aas.integrations.google.drive_manager import ensure_root_folder, ensure_section_folder, create_section_spreadsheet
+            from aas.capture.camera_registry import add_camera, update_camera
 
             inst = _load_institution()
             # Ensure root folder
@@ -345,7 +343,7 @@ def create_app() -> Flask:
 
             # Upload institution.json to Drive
             try:
-                from drive_manager import upload_file_to_folder
+                from aas.integrations.google.drive_manager import upload_file_to_folder
                 upload_file_to_folder(creds, INSTITUTION_JSON_PATH, root_id,
                                       mime_type='application/json',
                                       drive_filename='institution_config.json')
@@ -360,7 +358,7 @@ def create_app() -> Flask:
     @app.route('/setup/step3')
     @login_required
     def setup_step3():
-        from camera_registry import load_cameras
+        from aas.capture.camera_registry import load_cameras
         cameras = load_cameras()
         return render_template('setup/step3.html',
                                cameras=cameras,
@@ -388,7 +386,7 @@ def create_app() -> Flask:
         try:
             data    = request.get_json(force=True)
             updates = data.get('cameras', [])
-            from camera_registry import update_camera
+            from aas.capture.camera_registry import update_camera
             for item in updates:
                 update_camera(item['id'], rtsp_url=item.get('rtsp_url', ''))
             return jsonify({'status': 'success'})
@@ -398,7 +396,7 @@ def create_app() -> Flask:
     @app.route('/setup/complete')
     @login_required
     def setup_complete():
-        from camera_registry import load_cameras
+        from aas.capture.camera_registry import load_cameras
         inst    = _load_institution()
         cameras = load_cameras()
         return render_template('setup/complete.html',
@@ -427,7 +425,7 @@ def create_app() -> Flask:
         creds_ok  = os.path.exists(TOKEN_PATH) or os.path.exists(
             os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                          'credentials.json'))
-        from camera_registry import load_cameras
+        from aas.capture.camera_registry import load_cameras
         cameras   = load_cameras()
         return jsonify({
             'status':            'online',
@@ -449,7 +447,7 @@ def create_app() -> Flask:
 
     @app.route('/api/cameras', methods=['GET'])
     def list_cameras():
-        from camera_registry import load_cameras
+        from aas.capture.camera_registry import load_cameras
         cameras = load_cameras()
         return jsonify({'cameras': cameras, 'count': len(cameras)})
 
@@ -458,7 +456,7 @@ def create_app() -> Flask:
     def add_camera_route():
         try:
             data = request.get_json(force=True)
-            from camera_registry import add_camera
+            from aas.capture.camera_registry import add_camera
             cam = add_camera(
                 display_name = data.get('display_name', 'New Camera'),
                 rtsp_url     = data.get('rtsp_url', ''),
@@ -474,13 +472,13 @@ def create_app() -> Flask:
     @app.route('/api/cameras/<cam_id>', methods=['DELETE'])
     @login_required
     def delete_camera_route(cam_id):
-        from camera_registry import delete_camera
+        from aas.capture.camera_registry import delete_camera
         ok = delete_camera(cam_id)
         return jsonify({'status': 'success' if ok else 'not_found'})
 
     @app.route('/api/cameras/<cam_id>/status', methods=['GET'])
     def camera_status(cam_id):
-        from camera_registry import get_camera
+        from aas.capture.camera_registry import get_camera
         cam = get_camera(cam_id)
         if not cam:
             return jsonify({'ok': False, 'message': 'Camera not found'}), 404
@@ -548,7 +546,7 @@ def create_app() -> Flask:
         # Use camera-specific encodings folder if camera_id given
         enc_folder = ENCODINGS_FOLDER
         if cam_id:
-            from camera_registry import get_encodings_path
+            from aas.capture.camera_registry import get_encodings_path
             p = get_encodings_path(cam_id)
             if p:
                 enc_folder = p
@@ -591,8 +589,8 @@ def create_app() -> Flask:
         sheet_msg = ''
         if email and cam_id:
             try:
-                from camera_registry import get_camera
-                from spreadsheet import SpreadsheetManager
+                from aas.capture.camera_registry import get_camera
+                from aas.attendance.spreadsheet import SpreadsheetManager
                 cam = get_camera(cam_id)
                 if cam and cam.get('sheet_id'):
                     mgr = SpreadsheetManager(_get_creds())
@@ -635,7 +633,7 @@ def create_app() -> Flask:
 
         enc_folder = ENCODINGS_FOLDER
         if cam_id:
-            from camera_registry import get_encodings_path
+            from aas.capture.camera_registry import get_encodings_path
             p = get_encodings_path(cam_id)
             if p:
                 enc_folder = p
@@ -682,8 +680,8 @@ def create_app() -> Flask:
             if email:
                 try:
                     if cam_id:
-                        from camera_registry import get_camera
-                        from spreadsheet import SpreadsheetManager
+                        from aas.capture.camera_registry import get_camera
+                        from aas.attendance.spreadsheet import SpreadsheetManager
                         cam = get_camera(cam_id)
                         if cam and cam.get('sheet_id'):
                             mgr = SpreadsheetManager(_get_creds())
@@ -723,7 +721,7 @@ def create_app() -> Flask:
             sheet_id = None
             cam_total = 0
             if cam_id:
-                from camera_registry import get_camera
+                from aas.capture.camera_registry import get_camera
                 cam = get_camera(cam_id)
                 if cam:
                     sheet_id  = cam.get('sheet_id', '')
@@ -732,7 +730,7 @@ def create_app() -> Flask:
             # Mark all absent first
             try:
                 if sheet_id:
-                    from spreadsheet import SpreadsheetManager
+                    from aas.attendance.spreadsheet import SpreadsheetManager
                     mgr = SpreadsheetManager(_get_creds())
                     mgr.mark_all_absent(sheet_id)
                     cam_total = mgr.get_class_total(sheet_id)
@@ -750,7 +748,7 @@ def create_app() -> Flask:
 
             # Write present/late for each recognized student
             if sheet_id:
-                from spreadsheet import SpreadsheetManager
+                from aas.attendance.spreadsheet import SpreadsheetManager
                 mgr = SpreadsheetManager(_get_creds())
                 for name in result.get('present', []):
                     mgr.write_to_sheet(sheet_id, name)
@@ -764,7 +762,7 @@ def create_app() -> Flask:
 
             # TTS announcement (non-blocking)
             try:
-                from tts import announce_attendance
+                from aas.notifications.tts import announce_attendance
                 announce_attendance(boys=boys_count, girls=girls_count, total=total_class)
             except Exception as e:
                 print(f"  [TTS] Announcement skipped: {e}")
@@ -804,13 +802,13 @@ def create_app() -> Flask:
             sheet_msg    = ''
             sheet_id     = None
             if cam_id:
-                from camera_registry import get_camera
+                from aas.capture.camera_registry import get_camera
                 cam = get_camera(cam_id)
                 if cam:
                     sheet_id = cam.get('sheet_id', '')
             try:
                 if sheet_id:
-                    from spreadsheet import SpreadsheetManager
+                    from aas.attendance.spreadsheet import SpreadsheetManager
                     mgr = SpreadsheetManager(_get_creds())
                     mgr.mark_all_absent(sheet_id)
                 else:
@@ -823,7 +821,7 @@ def create_app() -> Flask:
             annotated_url = f"/captured/{os.path.basename(annotated)}" if annotated else None
 
             if sheet_id:
-                from spreadsheet import SpreadsheetManager
+                from aas.attendance.spreadsheet import SpreadsheetManager
                 mgr = SpreadsheetManager(_get_creds())
                 for name in result.get('present', []):
                     mgr.write_to_sheet(sheet_id, name)
@@ -834,7 +832,7 @@ def create_app() -> Flask:
             boys_count  = result.get('boys_count', 0)
             girls_count = result.get('girls_count', 0)
             try:
-                from tts import announce_attendance
+                from aas.notifications.tts import announce_attendance
                 total_class = boys_count + girls_count + result.get('unknown_count', 0)
                 announce_attendance(boys=boys_count, girls=girls_count, total=total_class)
             except Exception:
@@ -866,12 +864,12 @@ def create_app() -> Flask:
         sheet_id = request.args.get('sheet_id', '')
         try:
             if cam_id:
-                from camera_registry import get_camera
+                from aas.capture.camera_registry import get_camera
                 cam = get_camera(cam_id)
                 if cam:
                     sheet_id = cam.get('sheet_id', '')
             if sheet_id:
-                from spreadsheet import SpreadsheetManager
+                from aas.attendance.spreadsheet import SpreadsheetManager
                 mgr = SpreadsheetManager(_get_creds())
                 records = mgr.get_today_records(sheet_id)
                 return jsonify({'status': 'success', 'records': records, 'camera_id': cam_id})
@@ -946,10 +944,8 @@ def create_app() -> Flask:
     @app.route('/api/settings', methods=['POST'])
     @login_required
     def save_settings():
-        env_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            '.env'
-        )
+        from aas.core.config import ROOT_DIR
+        env_path = os.path.join(ROOT_DIR, '.env')
         data = request.get_json(force=True) or {}
         key_map = {
             'tolerance':    'RECOGNITION_TOLERANCE',

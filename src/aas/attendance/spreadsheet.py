@@ -38,8 +38,8 @@ import gspread
 import gspread.utils
 from google.oauth2.credentials import Credentials
 
-from config import CREDS_FILE, SHEET_NAME, MAX_IN_TIME
-import emailing as em
+from aas.core.config import CREDS_FILE, SHEET_NAME, MAX_IN_TIME
+from aas.notifications import emailing as em
 
 # ── Google Auth Scopes ─────────────────────────────────────────────────────────
 _SCOPES = [

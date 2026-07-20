@@ -18,7 +18,7 @@ Functions:
 import os
 import json
 import uuid
-from config import CAMERAS_JSON_PATH
+from aas.core.config import CAMERAS_JSON_PATH
 
 
 # ── Default template for a new camera entry ───────────────────────────────────
@@ -98,7 +98,7 @@ def add_camera(
     Register a new camera. Auto-assigns serial number and generates camera ID.
     Returns the new camera dict.
     """
-    from drive_manager import format_sheet_name
+    from aas.integrations.google.drive_manager import format_sheet_name
 
     cameras = load_cameras()
     serial = len(cameras) + 1
@@ -115,7 +115,7 @@ def add_camera(
     cam["serial"] = serial
 
     # Create per-camera encodings subfolder
-    from config import ENCODINGS_FOLDER
+    from aas.core.config import ENCODINGS_FOLDER
     enc_path = os.path.join(ENCODINGS_FOLDER, cam["encodings_subfolder"])
     os.makedirs(enc_path, exist_ok=True)
 
@@ -153,7 +153,7 @@ def delete_camera(cam_id: str) -> bool:
 
 def get_encodings_path(cam_id: str) -> str | None:
     """Return the absolute encodings folder path for a camera ID."""
-    from config import ENCODINGS_FOLDER
+    from aas.core.config import ENCODINGS_FOLDER
     cam = get_camera(cam_id)
     if not cam:
         return None

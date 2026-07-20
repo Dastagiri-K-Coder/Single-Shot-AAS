@@ -17,7 +17,7 @@ import json
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import Flow
-from config import OAUTH_CREDS_PATH, TOKEN_PATH
+from aas.core.config import OAUTH_CREDS_PATH, TOKEN_PATH
 
 # Scopes requested from the user
 SCOPES = [

@@ -3,15 +3,11 @@
 # =============================================================================
 
 import os
-import sys
 import datetime
 from unittest.mock import MagicMock, patch, call
 import pytest
 
-SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "face recognition source code")
-sys.path.insert(0, os.path.abspath(SRC_DIR))
-
-import spreadsheet
+from aas.attendance import spreadsheet
 
 
 class TestTodayString:
@@ -23,7 +19,7 @@ class TestTodayString:
 
     def test_format_no_leading_zeros(self):
         """Must not have leading zeros — Sheet format is M/D/YYYY not MM/DD/YYYY."""
-        with patch("spreadsheet.datetime") as mock_dt:
+        with patch("aas.attendance.spreadsheet.datetime") as mock_dt:
             mock_dt.date.today.return_value = datetime.date(2026, 7, 4)
             mock_dt.date.today.return_value.strftime = lambda fmt: datetime.date(2026, 7, 4).strftime(fmt)
             result = spreadsheet._today_string()
@@ -45,7 +41,7 @@ class TestMarkAllAbsent:
         mock_gspread.row_values.return_value = ["Name", "Email", "PIN", "7/14/2026"]
 
         # Inject the today header
-        with patch("spreadsheet._today_string", return_value="7/14/2026"):
+        with patch("aas.attendance.spreadsheet._today_string", return_value="7/14/2026"):
             spreadsheet.mark_all_absent()
 
         mock_gspread.batch_update.assert_called_once()
@@ -59,7 +55,7 @@ class TestMarkAllAbsent:
         mock_gspread.col_values.return_value = ["Name"]  # header only
         mock_gspread.row_values.return_value = ["Name", "Email", "PIN", "7/14/2026"]
 
-        with patch("spreadsheet._today_string", return_value="7/14/2026"):
+        with patch("aas.attendance.spreadsheet._today_string", return_value="7/14/2026"):
             spreadsheet.mark_all_absent()
 
         mock_gspread.batch_update.assert_not_called()
@@ -94,7 +90,7 @@ class TestWriteToSheet:
         """Should not update cell if student is already marked 'present'."""
         mock_gspread.cell.return_value = MagicMock(value="present")
 
-        with patch("spreadsheet._today_string", return_value="7/14/2026"):
+        with patch("aas.attendance.spreadsheet._today_string", return_value="7/14/2026"):
             spreadsheet.write_to_sheet("Alice")
 
         mock_gspread.update_cell.assert_not_called()
@@ -104,7 +100,7 @@ class TestWriteToSheet:
         import gspread
         mock_gspread.find.side_effect = gspread.exceptions.CellNotFound("not found")
 
-        with patch("spreadsheet._today_string", return_value="7/14/2026"):
+        with patch("aas.attendance.spreadsheet._today_string", return_value="7/14/2026"):
             spreadsheet.write_to_sheet("UnknownPerson")
 
         captured = capsys.readouterr()

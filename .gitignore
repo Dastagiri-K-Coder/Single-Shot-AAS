@@ -12,6 +12,10 @@ service_account.json
 known face photos/
 known face encodings/
 captured/
+data/
+config/cameras.json
+config/institution.json
+src/aas/core/*.json
 
 # ── Vosk Voice Model (large binary, download separately) ──────────────────────
 vosk-model-*/

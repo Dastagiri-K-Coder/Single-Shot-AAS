@@ -5,6 +5,7 @@ import tempfile
 import numpy as np
 import pytest
 from unittest.mock import patch
+from aas.recognition import engine as recognition
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,11 +40,10 @@ def _write_legacy_pkl(folder, name, num_angles=2):
 
 def test_load_new_format_gender(tmp_path, monkeypatch):
     """New dict pkl: gender is loaded into known_face_genders."""
-    monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_path))
+    monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_path))
     _write_pkl(str(tmp_path), "alice", "F", num_angles=2)
     _write_pkl(str(tmp_path), "bob",   "M", num_angles=3)
 
-    import recognition
     recognition.load_facial_encodings_and_names_from_memory()
 
     assert recognition.known_face_genders.get("alice") == "F"
@@ -52,10 +52,9 @@ def test_load_new_format_gender(tmp_path, monkeypatch):
 
 def test_load_new_format_encoding_count(tmp_path, monkeypatch):
     """New dict pkl: all angle encodings are loaded individually."""
-    monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_path))
+    monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_path))
     _write_pkl(str(tmp_path), "carol", "F", num_angles=3)
 
-    import recognition
     recognition.load_facial_encodings_and_names_from_memory()
 
     count = recognition.known_face_names.count("carol")
@@ -64,10 +63,9 @@ def test_load_new_format_encoding_count(tmp_path, monkeypatch):
 
 def test_load_legacy_format_defaults_to_male(tmp_path, monkeypatch):
     """Legacy bare-list pkl: gender defaults to 'M'."""
-    monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_path))
+    monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_path))
     _write_legacy_pkl(str(tmp_path), "dave", num_angles=2)
 
-    import recognition
     recognition.load_facial_encodings_and_names_from_memory()
 
     assert recognition.known_face_genders.get("dave") == "M"
@@ -76,11 +74,10 @@ def test_load_legacy_format_defaults_to_male(tmp_path, monkeypatch):
 
 def test_load_mixed_formats(tmp_path, monkeypatch):
     """Mix of new and legacy pkl files loads correctly."""
-    monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_path))
+    monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_path))
     _write_pkl(str(tmp_path),        "eve",  "F", num_angles=3)
     _write_legacy_pkl(str(tmp_path), "frank",     num_angles=1)
 
-    import recognition
     recognition.load_facial_encodings_and_names_from_memory()
 
     assert recognition.known_face_genders.get("eve")   == "F"
@@ -92,16 +89,15 @@ def test_load_mixed_formats(tmp_path, monkeypatch):
 
 def test_run_recognition_boys_girls_count(tmp_path, monkeypatch):
     """run_recognition result must include boys_count, girls_count, other_count."""
-    monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_path))
+    monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_path))
     _write_pkl(str(tmp_path), "boy1",  "M", num_angles=1)
     _write_pkl(str(tmp_path), "boy2",  "M", num_angles=1)
     _write_pkl(str(tmp_path), "girl1", "F", num_angles=1)
 
-    import recognition
     recognition.load_facial_encodings_and_names_from_memory()
 
     # Simulate a result where all three are "present"
-    with patch("recognition.run_recognition") as mock_run:
+    with patch("aas.recognition.engine.run_recognition") as mock_run:
         mock_run.return_value = {
             "present":         ["boy1", "boy2", "girl1"],
             "present_genders": {"boy1": "M", "boy2": "M", "girl1": "F"},
@@ -124,10 +120,9 @@ def test_run_recognition_boys_girls_count(tmp_path, monkeypatch):
 
 def test_result_dict_has_required_keys(tmp_path, monkeypatch):
     """run_recognition result always has boys_count and girls_count keys."""
-    monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_path))
+    monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_path))
     _write_pkl(str(tmp_path), "student_a", "M", num_angles=1)
 
-    import recognition
     recognition.load_facial_encodings_and_names_from_memory()
 
     required_keys = {
@@ -135,7 +130,7 @@ def test_result_dict_has_required_keys(tmp_path, monkeypatch):
         "unknown_count", "total_faces", "quality_ok", "recognized_at",
     }
 
-    with patch("recognition.run_recognition") as mock_run:
+    with patch("aas.recognition.engine.run_recognition") as mock_run:
         mock_run.return_value = {k: 0 if k != "present" else [] for k in required_keys}
         mock_run.return_value["present"]      = []
         mock_run.return_value["recognized_at"] = "2026-07-20T12:00:00"
@@ -150,9 +145,8 @@ def test_result_dict_has_required_keys(tmp_path, monkeypatch):
 
 def test_boys_count_all_male(tmp_path, monkeypatch):
     """All-male class: boys_count == len(present), girls_count == 0."""
-    monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_path))
+    monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_path))
 
-    import recognition
     recognition.known_face_genders = {"m1": "M", "m2": "M", "m3": "M"}
 
     present = ["m1", "m2", "m3"]
@@ -165,9 +159,8 @@ def test_boys_count_all_male(tmp_path, monkeypatch):
 
 def test_girls_count_all_female(tmp_path, monkeypatch):
     """All-female class: girls_count == len(present), boys_count == 0."""
-    monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_path))
+    monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_path))
 
-    import recognition
     recognition.known_face_genders = {"f1": "F", "f2": "F"}
 
     present = ["f1", "f2"]
@@ -180,7 +173,6 @@ def test_girls_count_all_female(tmp_path, monkeypatch):
 
 def test_gender_count_mixed_class():
     """Mixed class: boys and girls counted separately."""
-    import recognition
     recognition.known_face_genders = {
         "ram":  "M", "sita": "F", "ravi": "M",
         "priya": "F", "ajay": "M",

@@ -29,14 +29,14 @@ import cv2
 import face_recognition
 import numpy as np
 
-from config import (
+from aas.core.config import (
     ENCODINGS_FOLDER,
     CAPTURED_FOLDER,
     RECOGNITION_TOLERANCE,
     RECOGNITION_SCALE,
     FACE_DETECTION_MODEL,
 )
-import spreadsheet
+from aas.attendance import spreadsheet
 
 # ── In-memory stores (populated by load_facial_encodings_and_names_from_memory) ─
 known_face_encodings: list = []

@@ -33,7 +33,7 @@ import queue
 import os
 import threading
 
-from config import VOICE_TRIGGER_PHRASE, VOSK_MODEL_PATH
+from aas.core.config import VOICE_TRIGGER_PHRASE, VOSK_MODEL_PATH
 
 # Lazy imports — only loaded when voice mode is activated
 # This prevents import errors if vosk/sounddevice are not installed

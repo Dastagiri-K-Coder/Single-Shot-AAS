@@ -3,17 +3,13 @@
 # =============================================================================
 
 import os
-import sys
 import pickle
 from unittest.mock import patch, MagicMock
 
 import numpy as np
 import pytest
 
-SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "face recognition source code")
-sys.path.insert(0, os.path.abspath(SRC_DIR))
-
-import recognition
+from aas.recognition import engine as recognition
 
 
 class TestImageQualityCheck:
@@ -62,7 +58,7 @@ class TestLoadEncodings:
         with open(pkl_path, "wb") as f:
             pickle.dump([fake_encoding], f)
 
-        monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
+        monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
         recognition.load_facial_encodings_and_names_from_memory()
 
         assert len(recognition.known_face_names) == 1
@@ -74,7 +70,7 @@ class TestLoadEncodings:
         with open(pkl_path, "wb") as f:
             pickle.dump([fake_encoding, fake_encoding_2, fake_encoding], f)
 
-        monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
+        monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
         recognition.load_facial_encodings_and_names_from_memory()
 
         assert recognition.known_face_names.count("Bob") == 3
@@ -82,13 +78,13 @@ class TestLoadEncodings:
     def test_skips_non_pkl_files(self, tmp_dirs, monkeypatch):
         """Non-.pkl files in encodings folder should be ignored."""
         (tmp_dirs["encodings"] / "notes.txt").write_text("not a pkl")
-        monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
+        monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
         recognition.load_facial_encodings_and_names_from_memory()
         assert len(recognition.known_face_names) == 0
 
     def test_raises_if_folder_missing(self, monkeypatch):
         """Should raise FileNotFoundError if encodings folder doesn't exist."""
-        monkeypatch.setattr("recognition.ENCODINGS_FOLDER", "/nonexistent/path")
+        monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", "/nonexistent/path")
         with pytest.raises(FileNotFoundError):
             recognition.load_facial_encodings_and_names_from_memory()
 
@@ -98,7 +94,7 @@ class TestLoadEncodings:
         with open(pkl_path, "wb") as f:
             pickle.dump([fake_encoding], f)
 
-        monkeypatch.setattr("recognition.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
+        monkeypatch.setattr("aas.recognition.engine.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
         recognition.load_facial_encodings_and_names_from_memory()
         recognition.load_facial_encodings_and_names_from_memory()
 

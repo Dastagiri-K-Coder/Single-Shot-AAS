@@ -31,12 +31,9 @@ Examples:
 import sys
 import os
 
-# Add this directory to path so imports resolve correctly
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-import recognition
-import spreadsheet
-import capture
+from aas.recognition import engine as recognition
+from aas.attendance import spreadsheet
+from aas.capture import capture
 
 
 def _load_and_mark():
@@ -98,7 +95,7 @@ def run_once(image_path: str = None, with_preview: bool = False) -> dict:
 
 def start_voice_mode() -> None:
     """Start the offline voice trigger. Blocks indefinitely until Ctrl+C."""
-    from voice_trigger import listen_for_trigger
+    from aas.voice.voice_trigger import listen_for_trigger
 
     print("Initialising voice trigger mode ...")
     _load_and_mark()
@@ -118,20 +115,20 @@ def start_voice_mode() -> None:
 
 def start_web_mode() -> None:
     """Start the Flask web dashboard."""
-    from config import WEB_HOST, WEB_PORT
+    from aas.core.config import WEB_HOST, WEB_PORT
     # Load encodings once before starting the server
     recognition.load_facial_encodings_and_names_from_memory()
     print(f"\nStarting Web Dashboard at http://{WEB_HOST}:{WEB_PORT}")
     print("Open this URL in your browser or share with faculty on the same network.\n")
 
-    from web_app.app import create_app
+    from aas.web.app import create_app
     app = create_app()
     app.run(host=WEB_HOST, port=WEB_PORT, debug=False)
 
 
 def enroll_student(name: str) -> None:
     """Run the interactive 3-angle enrollment for one student."""
-    import enroll
+    from aas.enrollment import enroll
     enroll.enroll_student_3angles(name)
 
 
@@ -159,7 +156,7 @@ if __name__ == "__main__":
         enroll_student(args[1])
 
     elif args[0] == "--test-mic":
-        from voice_trigger import test_microphone
+        from aas.voice.voice_trigger import test_microphone
         test_microphone(duration_seconds=8)
 
     elif os.path.isfile(args[0]):

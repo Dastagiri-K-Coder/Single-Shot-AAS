@@ -5,11 +5,11 @@ After=network.target
 Wants=network.target
 
 [Service]
-# ── Working directory (where config.py and .env live) ──────────────────────
-WorkingDirectory=/home/giri/Projects/Single Shot 2A/Kalyan-Koppula/face recognition source code
+# ── Working directory (project root where main.py and .env live) ──────────
+WorkingDirectory=/home/giri/Projects/Single Shot 2A/Single Shot AAS
 
 # ── Start command ──────────────────────────────────────────────────────────
-ExecStart=/home/giri/Projects/Single Shot 2A/Kalyan-Koppula/.venv/bin/python main.py --web
+ExecStart=/home/giri/Projects/Single Shot 2A/Single Shot AAS/.venv/bin/python -m aas
 
 # ── Restart policy ──────────────────────────────────────────────────────────
 Restart=always

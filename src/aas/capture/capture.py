@@ -18,7 +18,7 @@ import os
 import datetime
 import threading
 
-from config import (
+from aas.core.config import (
     IP_CAMERA_URL,
     USE_WEBCAM,
     WEBCAM_INDEX,
@@ -46,7 +46,7 @@ def get_camera_source(camera_id: str = None):
     """
     if camera_id:
         try:
-            from camera_registry import get_camera
+            from aas.capture.camera_registry import get_camera
             cam = get_camera(camera_id)
             if cam and cam.get("rtsp_url"):
                 return cam["rtsp_url"]

@@ -3,7 +3,6 @@
 # =============================================================================
 
 import os
-import sys
 import pickle
 import tempfile
 import shutil
@@ -11,10 +10,6 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-
-# ── Add source to path ────────────────────────────────────────────────────────
-SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "face recognition source code")
-sys.path.insert(0, os.path.abspath(SRC_DIR))
 
 
 # ── Fixtures: temp filesystem ──────────────────────────────────────────────────
@@ -81,8 +76,8 @@ def mock_gspread(monkeypatch):
     mock_gc = MagicMock()
     mock_gc.open.return_value.sheet1 = mock_sheet
 
-    monkeypatch.setattr("spreadsheet._gc", mock_gc)
-    monkeypatch.setattr("spreadsheet.sheet", mock_sheet)
+    monkeypatch.setattr("aas.attendance.spreadsheet._gc", mock_gc)
+    monkeypatch.setattr("aas.attendance.spreadsheet.sheet", mock_sheet)
     return mock_sheet
 
 

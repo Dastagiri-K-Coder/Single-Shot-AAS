@@ -7,26 +7,22 @@
 # =============================================================================
 
 import os
-import sys
 import json
 import pickle
 from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "face recognition source code")
-sys.path.insert(0, os.path.abspath(SRC_DIR))
-
 
 @pytest.fixture()
 def flask_client(tmp_dirs, monkeypatch):
     """Create a Flask test client with tmp data directories."""
     # Patch config paths before importing app
-    monkeypatch.setattr("config.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
-    monkeypatch.setattr("config.PHOTO_FOLDER",     str(tmp_dirs["photos"]))
-    monkeypatch.setattr("config.CAPTURED_FOLDER",  str(tmp_dirs["captured"]))
+    monkeypatch.setattr("aas.core.config.ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
+    monkeypatch.setattr("aas.core.config.PHOTO_FOLDER",     str(tmp_dirs["photos"]))
+    monkeypatch.setattr("aas.core.config.CAPTURED_FOLDER",  str(tmp_dirs["captured"]))
 
-    from web_app.app import create_app
+    from aas.web.app import create_app
     app = create_app()
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
@@ -150,7 +146,7 @@ class TestSettingsRoute:
         env_path = tmp_dirs["captured"].parent / ".env"
         env_path.write_text("RECOGNITION_TOLERANCE=0.55\n")
         monkeypatch.setattr(
-            "web_app.app.os.path.join",
+            "aas.web.app.os.path.join",
             lambda *a: str(env_path) if ".env" in str(a) else os.path.join(*a),
         )
 

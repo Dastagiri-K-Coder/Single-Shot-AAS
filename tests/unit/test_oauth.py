@@ -1,9 +1,11 @@
 """tests/unit/test_oauth.py — Unit tests for oauth.py"""
 import os
 import json
+import importlib
 import pytest
 import tempfile
 from unittest.mock import patch, MagicMock
+from aas.integrations.google import oauth
 
 
 @pytest.fixture
@@ -26,10 +28,9 @@ def tmp_token(tmp_path):
 
 def test_get_user_info(tmp_token, monkeypatch):
     """get_user_info() returns email and name from token.json."""
-    monkeypatch.setattr("oauth.TOKEN_PATH", tmp_token)
-    import importlib, oauth
+    monkeypatch.setattr("aas.integrations.google.oauth.TOKEN_PATH", tmp_token)
     importlib.reload(oauth)
-    monkeypatch.setattr("oauth.TOKEN_PATH", tmp_token)
+    monkeypatch.setattr("aas.integrations.google.oauth.TOKEN_PATH", tmp_token)
     info = oauth.get_user_info()
     assert info["email"] == "test@college.edu"
     assert info["name"] == "Test Admin"
@@ -37,16 +38,14 @@ def test_get_user_info(tmp_token, monkeypatch):
 
 def test_get_user_info_missing_file(monkeypatch, tmp_path):
     """get_user_info() returns empty dict when token.json does not exist."""
-    monkeypatch.setattr("oauth.TOKEN_PATH", str(tmp_path / "nonexistent.json"))
-    import oauth
+    monkeypatch.setattr("aas.integrations.google.oauth.TOKEN_PATH", str(tmp_path / "nonexistent.json"))
     info = oauth.get_user_info()
     assert info == {}
 
 
 def test_revoke_token(tmp_token, monkeypatch):
     """revoke_token() deletes token.json."""
-    monkeypatch.setattr("oauth.TOKEN_PATH", tmp_token)
-    import oauth
+    monkeypatch.setattr("aas.integrations.google.oauth.TOKEN_PATH", tmp_token)
     assert os.path.exists(tmp_token)
     oauth.revoke_token()
     assert not os.path.exists(tmp_token)
@@ -54,14 +53,12 @@ def test_revoke_token(tmp_token, monkeypatch):
 
 def test_create_oauth_flow_missing_creds(monkeypatch, tmp_path):
     """create_oauth_flow() raises FileNotFoundError when credentials missing."""
-    monkeypatch.setattr("oauth.OAUTH_CREDS_PATH", str(tmp_path / "missing.json"))
-    import oauth
+    monkeypatch.setattr("aas.integrations.google.oauth.OAUTH_CREDS_PATH", str(tmp_path / "missing.json"))
     with pytest.raises(FileNotFoundError, match="oauth_credentials.json"):
         oauth.create_oauth_flow()
 
 
 def test_is_authenticated_no_token(monkeypatch, tmp_path):
     """is_authenticated() returns False when no token file exists."""
-    monkeypatch.setattr("oauth.TOKEN_PATH", str(tmp_path / "missing.json"))
-    import oauth
+    monkeypatch.setattr("aas.integrations.google.oauth.TOKEN_PATH", str(tmp_path / "missing.json"))
     assert oauth.is_authenticated() is False

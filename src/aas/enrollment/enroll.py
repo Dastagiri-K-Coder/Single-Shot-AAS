@@ -26,8 +26,8 @@ import pickle
 import cv2
 import face_recognition
 
-from config import PHOTO_FOLDER, ENCODINGS_FOLDER, WEBCAM_INDEX
-import spreadsheet
+from aas.core.config import PHOTO_FOLDER, ENCODINGS_FOLDER, WEBCAM_INDEX
+from aas.attendance import spreadsheet
 
 # Angles for the 3-shot enrollment workflow
 _ANGLES = [

@@ -3,16 +3,12 @@
 # =============================================================================
 
 import os
-import sys
 import smtplib
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-SRC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "face recognition source code")
-sys.path.insert(0, os.path.abspath(SRC_DIR))
-
-import emailing
+from aas.notifications import emailing
 
 
 class TestSendEmail:

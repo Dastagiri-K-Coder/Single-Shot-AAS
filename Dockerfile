@@ -11,11 +11,10 @@
 #
 #  Run (web mode):
 #    docker run -p 5000:5000 \
-#      --env-file face\ recognition\ source\ code/.env \
-#      -v $(pwd)/known\ face\ encodings:/app/known_face_encodings \
-#      -v $(pwd)/known\ face\ photos:/app/known_face_photos \
-#      -v $(pwd)/captured:/app/captured \
-#      -v $(pwd)/face\ recognition\ source\ code/credentials.json:/app/src/credentials.json \
+#      --env-file .env \
+#      -v $(pwd)/data:/app/data \
+#      -v $(pwd)/config:/app/config \
+#      -v $(pwd)/credentials.json:/app/credentials.json \
 #      attendance-system:latest
 # =============================================================================
 
@@ -43,7 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-COPY "face recognition source code/requirements.txt" ./requirements.txt
+COPY requirements.txt ./requirements.txt
 
 # Build wheels (dlib compile happens here — cached unless requirements.txt changes)
 RUN pip install --upgrade pip && \
@@ -79,14 +78,15 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*.whl \
 WORKDIR /app
 
 # Copy source code
-COPY "face recognition source code/" ./src/
-COPY "face recognition source code/web_app/" ./src/web_app/
+COPY src/ ./src/
+COPY main.py ./main.py
+COPY config/ ./config/
 
 # Create data directories (mounted as volumes in production)
 RUN mkdir -p \
-    /app/known_face_photos \
-    /app/known_face_encodings \
-    /app/captured
+    /app/data/known_face_photos \
+    /app/data/known_face_encodings \
+    /app/data/captured
 
 # Symlink data dirs so config.py paths resolve correctly
 # config.py uses ROOT_DIR = parent of src/ = /app
@@ -113,6 +113,7 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:5000/api/status || exit 1
 
-# ── Entry point ───────────────────────────────────────────────────────────────
-WORKDIR /app/src
+# ── Entry point ───────────────────────────────────────────────────────────────────
+ENV PYTHONPATH=/app/src
+WORKDIR /app
 CMD ["python", "main.py", "--web"]
