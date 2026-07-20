@@ -1,0 +1,61 @@
+{
+  "name": "AI Attendance System",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/app",
+
+  // VS Code extensions auto-installed in the container
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
+        "ms-python.debugpy",
+        "redhat.vscode-yaml",
+        "eamodio.gitlens",
+        "streetsidesoftware.code-spell-checker",
+        "usernamehw.errorlens"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/app/.venv/bin/python",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "ruff.enable": true,
+        "ruff.fixAll": true,
+        "python.analysis.typeCheckingMode": "basic",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true
+      }
+    }
+  },
+
+  // Port forwarding
+  "forwardPorts": [5000, 6379],
+  "portsAttributes": {
+    "5000": {
+      "label": "Flask Web Dashboard",
+      "onAutoForward": "openBrowser"
+    },
+    "6379": {
+      "label": "Redis"
+    }
+  },
+
+  // Post-create: install dev tools and hooks
+  "postCreateCommand": "pip install -r /workspace/requirements-dev.txt && pre-commit install",
+
+  // Mount the workspace source
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind"
+  ],
+
+  "remoteUser": "appuser"
+}

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setup — Step 3: Camera Assignment | Single Shot AAS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0e1a; --card: #111827; --card2: #1a2235; --border: rgba(255,255,255,0.07);
+      --accent: #4f8ef7; --accent2: #7c3aed; --text: #f1f5f9; --muted: #94a3b8;
+      --input-bg: rgba(255,255,255,0.04); --green: #10b981; --red: #ef4444; --yellow: #f59e0b;
+    }
+    html, body { min-height:100vh; background:var(--bg); font-family:'Outfit',sans-serif; color:var(--text); }
+    body { display:flex; flex-direction:column; align-items:center; padding:2rem 1rem; gap:2rem; }
+    body::before {
+      content:''; position:fixed; inset:0;
+      background: radial-gradient(ellipse 70% 50% at 20% 20%, rgba(79,142,247,.08) 0%, transparent 60%);
+      pointer-events:none;
+    }
+
+    .progress-wrap { width:100%; max-width:680px; position:relative; z-index:1; }
+    .progress-steps { display:flex; align-items:center; }
+    .step-dot { width:32px; height:32px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:.75rem; font-weight:600; color:var(--muted); flex-shrink:0; background:var(--card); }
+    .step-dot.active { border-color:var(--accent); color:var(--accent); background:rgba(79,142,247,.12); }
+    .step-dot.done { border-color:var(--green); color:#fff; background:var(--green); }
+    .step-line { flex:1; height:2px; background:var(--border); }
+    .step-line.done { background:var(--green); }
+    .step-labels { display:flex; justify-content:space-between; margin-top:.5rem; }
+    .step-label { font-size:.67rem; color:var(--muted); text-align:center; width:80px; }
+    .step-label.active { color:var(--accent); }
+    .step-label.done { color:var(--green); }
+
+    .card {
+      background:var(--card); border:1px solid var(--border); border-radius:20px;
+      padding:2.5rem 2.8rem; width:100%; max-width:680px;
+      display:flex; flex-direction:column; gap:1.5rem;
+      box-shadow:0 0 60px rgba(0,0,0,.5); position:relative; z-index:1;
+      animation: slideUp .4s ease forwards;
+    }
+    @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+    .card-header h2 { font-size:1.5rem; font-weight:700; }
+    .card-header p  { font-size:.85rem; color:var(--muted); margin-top:.3rem; }
+
+    /* ── Camera assignment rows ── */
+    .cam-row {
+      background:var(--card2); border:1px solid var(--border); border-radius:14px;
+      padding:1.25rem 1.5rem; display:flex; flex-direction:column; gap:.9rem;
+    }
+    .cam-row-header {
+      display:flex; align-items:center; gap:.6rem;
+    }
+    .cam-index {
+      width:28px; height:28px; border-radius:50%;
+      background:rgba(79,142,247,.15); border:1px solid rgba(79,142,247,.3);
+      display:flex; align-items:center; justify-content:center;
+      font-size:.75rem; font-weight:700; color:var(--accent); flex-shrink:0;
+    }
+    .cam-sheet-name { font-size:.82rem; color:var(--text); font-weight:500; }
+    .cam-sheet-code { font-size:.72rem; color:var(--muted); font-family:monospace; }
+
+    .cam-url-row { display:flex; gap:.6rem; align-items:center; }
+    input {
+      background:var(--input-bg); border:1px solid var(--border); border-radius:10px;
+      padding:.65rem 1rem; color:var(--text); font-family:'Outfit',sans-serif;
+      font-size:.88rem; outline:none; flex:1;
+      transition:border-color .2s, box-shadow .2s;
+    }
+    input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,142,247,.15); }
+    label { font-size:.76rem; font-weight:500; color:var(--muted); }
+
+    .btn-test {
+      flex-shrink:0; background:transparent; border:1px solid var(--border);
+      color:var(--muted); border-radius:10px; padding:.65rem 1rem;
+      font-family:'Outfit',sans-serif; font-size:.82rem; cursor:pointer;
+      transition:.15s; white-space:nowrap;
+    }
+    .btn-test:hover { border-color:var(--accent); color:var(--accent); }
+
+    .cam-status {
+      font-size:.75rem; display:none; align-items:center; gap:.4rem;
+    }
+    .cam-status.ok { color:var(--green); display:flex; }
+    .cam-status.fail { color:var(--red); display:flex; }
+    .cam-status.testing { color:var(--yellow); display:flex; }
+
+    /* ── Buttons ── */
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+      padding:.8rem 2rem; border-radius:12px; font-size:.95rem;
+      font-family:'Outfit',sans-serif; font-weight:600; cursor:pointer; border:none;
+      transition:transform .15s, box-shadow .15s;
+    }
+    .btn-primary { background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#fff; box-shadow:0 4px 20px rgba(79,142,247,.3); }
+    .btn-primary:hover { transform:translateY(-2px); }
+    .btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+    .btn-actions { display:flex; justify-content:space-between; align-items:center; margin-top:.5rem; }
+
+    .hint { font-size:.76rem; color:var(--muted); line-height:1.5; }
+  </style>
+</head>
+<body>
+
+  <!-- Progress -->
+  <div class="progress-wrap">
+    <div class="progress-steps">
+      <div class="step-dot done">✓</div>
+      <div class="step-line done"></div>
+      <div class="step-dot done">✓</div>
+      <div class="step-line done"></div>
+      <div class="step-dot active">3</div>
+      <div class="step-line"></div>
+      <div class="step-dot">✓</div>
+    </div>
+    <div class="step-labels">
+      <span class="step-label done">Institution</span>
+      <span class="step-label done">Section</span>
+      <span class="step-label active">Cameras</span>
+      <span class="step-label">Done</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>📷 Assign Cameras</h2>
+      <p>Enter the RTSP / LAN URL for the camera assigned to each section. You can skip and configure later from the dashboard.</p>
+    </div>
+
+    <p class="hint">💡 Tip: RTSP URL format — <code style="background:rgba(255,255,255,.06);padding:.15rem .4rem;border-radius:5px;font-size:.78rem;">rtsp://username:password@192.168.1.10:554/stream</code></p>
+
+    <!-- One row per camera/section -->
+    <div id="cameraRows">
+      {% for cam in cameras %}
+      <div class="cam-row" id="row_{{ cam.id }}">
+        <div class="cam-row-header">
+          <div class="cam-index">{{ loop.index }}</div>
+          <div>
+            <div class="cam-sheet-name">{{ cam.display_name or cam.sheet_name }}</div>
+            <div class="cam-sheet-code">{{ cam.sheet_name }}</div>
+          </div>
+        </div>
+        <div>
+          <label>Camera URL (RTSP / LAN IP)</label>
+          <div class="cam-url-row">
+            <input type="text" id="url_{{ cam.id }}" placeholder="rtsp://192.168.1.{{ loop.index * 10 }}/stream"
+                   value="{{ cam.rtsp_url or '' }}" />
+            <button class="btn-test" onclick="testCamera('{{ cam.id }}')">⚡ Test</button>
+          </div>
+          <div class="cam-status" id="status_{{ cam.id }}"></div>
+        </div>
+      </div>
+      {% else %}
+      <div style="text-align:center; color:var(--muted); padding:1rem;">
+        No cameras registered yet. Go back to add sections first.
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="btn-actions">
+      <a href="/setup/step2" style="font-size:.82rem; color:var(--muted); text-decoration:none;">← Back</a>
+      <button class="btn btn-primary" onclick="saveAndContinue()">
+        Finish Setup →
+      </button>
+    </div>
+  </div>
+
+  <script>
+    var cameras = {{ cameras_json | safe }};
+
+    function testCamera(camId) {
+      var url    = document.getElementById('url_' + camId).value.trim();
+      var status = document.getElementById('status_' + camId);
+      status.className = 'cam-status testing';
+      status.style.display = 'flex';
+      status.textContent = '⏳ Testing connection…';
+
+      fetch('/api/setup/test-camera', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camera_id: camId, rtsp_url: url })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          status.className = 'cam-status ok';
+          status.textContent = '✓ Camera reachable';
+        } else {
+          status.className = 'cam-status fail';
+          status.textContent = '✗ ' + (data.message || 'Cannot connect');
+        }
+      })
+      .catch(() => {
+        status.className = 'cam-status fail';
+        status.textContent = '✗ Request failed';
+      });
+    }
+
+    function saveAndContinue() {
+      var updates = cameras.map(function(cam) {
+        var urlEl = document.getElementById('url_' + cam.id);
+        return { id: cam.id, rtsp_url: urlEl ? urlEl.value.trim() : '' };
+      });
+
+      fetch('/api/setup/assign-cameras', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cameras: updates })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'success') window.location.href = '/setup/complete';
+        else alert('Error: ' + data.message);
+      })
+      .catch(e => alert('Request failed: ' + e));
+    }
+  </script>
+</body>
+</html>

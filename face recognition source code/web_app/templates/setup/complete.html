@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setup Complete! | Single Shot AAS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0e1a; --card: #111827; --border: rgba(255,255,255,0.07);
+      --accent: #4f8ef7; --accent2: #7c3aed; --text: #f1f5f9; --muted: #94a3b8;
+      --green: #10b981;
+    }
+    html, body { min-height:100vh; background:var(--bg); font-family:'Outfit',sans-serif; color:var(--text); display:flex; align-items:center; justify-content:center; padding:2rem 1rem; }
+    body::before {
+      content:''; position:fixed; inset:0;
+      background: radial-gradient(ellipse 60% 50% at 50% 40%, rgba(16,185,129,.08) 0%, transparent 60%);
+      pointer-events:none;
+    }
+    .card {
+      background:var(--card); border:1px solid var(--border); border-radius:24px;
+      padding:3rem 3.5rem; width:100%; max-width:480px;
+      display:flex; flex-direction:column; align-items:center; gap:1.5rem;
+      box-shadow:0 0 80px rgba(0,0,0,.6); text-align:center;
+      position:relative; z-index:1;
+      animation: bounceIn .6s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes bounceIn {
+      from { opacity:0; transform:scale(.85) translateY(30px); }
+      to   { opacity:1; transform:scale(1) translateY(0); }
+    }
+    .success-ring {
+      width:90px; height:90px; border-radius:50%;
+      background:rgba(16,185,129,.12); border:2px solid rgba(16,185,129,.3);
+      display:flex; align-items:center; justify-content:center;
+      font-size:2.5rem;
+      box-shadow: 0 0 40px rgba(16,185,129,.2);
+    }
+    h1 { font-size:2rem; font-weight:800; color:var(--green); letter-spacing:-0.02em; }
+    .subtitle { font-size:.9rem; color:var(--muted); line-height:1.6; }
+    .summary {
+      background:rgba(255,255,255,.03); border:1px solid var(--border);
+      border-radius:14px; padding:1.25rem 1.5rem;
+      width:100%; text-align:left;
+      display:flex; flex-direction:column; gap:.7rem;
+    }
+    .sum-row { display:flex; justify-content:space-between; font-size:.82rem; }
+    .sum-label { color:var(--muted); }
+    .sum-val   { color:var(--text); font-weight:500; }
+    .divider { height:1px; background:var(--border); width:100%; }
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+      padding:.9rem 2.5rem; border-radius:14px; font-size:1rem;
+      font-family:'Outfit',sans-serif; font-weight:700; cursor:pointer; border:none;
+      text-decoration:none; transition:transform .15s, box-shadow .15s;
+    }
+    .btn-primary {
+      background:linear-gradient(135deg, var(--accent), var(--accent2));
+      color:#fff; box-shadow:0 4px 20px rgba(79,142,247,.4);
+    }
+    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(79,142,247,.5); }
+    .note { font-size:.75rem; color:rgba(148,163,184,.5); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="success-ring">✓</div>
+    <h1>Setup Complete!</h1>
+    <p class="subtitle">
+      Your institution is configured. Google Drive folder structure and spreadsheets have been created successfully.
+    </p>
+
+    <!-- Summary of what was created -->
+    <div class="summary">
+      <div class="sum-row">
+        <span class="sum-label">Institution</span>
+        <span class="sum-val">{{ institution.institution_name }}</span>
+      </div>
+      <div class="sum-row">
+        <span class="sum-label">Drive folder</span>
+        <span class="sum-val">Single Shot AAS</span>
+      </div>
+      <div class="sum-row">
+        <span class="sum-label">Sections created</span>
+        <span class="sum-val">{{ cameras | length }}</span>
+      </div>
+      <div class="sum-row">
+        <span class="sum-label">Cameras registered</span>
+        <span class="sum-val">{{ cameras | length }}</span>
+      </div>
+    </div>
+
+    <a href="/dashboard" class="btn btn-primary">
+      Launch Dashboard →
+    </a>
+    <p class="note">You can always add more sections and cameras from the dashboard settings.</p>
+  </div>
+</body>
+</html>

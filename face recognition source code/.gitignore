@@ -1,0 +1,58 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Google Cloud credentials (NEVER commit these) ─────────────────────────────
+credentials.json
+oauth_credentials.json
+token.json
+service_account.json
+*-credentials.json
+*_credentials.json
+
+# ── Generated data ────────────────────────────────────────────────────────────
+known face encodings/
+captured/
+photos/
+cameras.json
+institution.json
+
+# ── Vosk model (large binary) ─────────────────────────────────────────────────
+vosk-model-*/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Test / coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.log
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+*.pid

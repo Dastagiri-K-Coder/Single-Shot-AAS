@@ -1,0 +1,28 @@
+# ============================================================
+#  requirements-dev.txt — Developer tooling dependencies
+#  Install with: pip install -r requirements-dev.txt
+# ============================================================
+
+# --- Linting & Formatting ---
+ruff==0.4.4
+black==24.4.2
+isort==5.13.2
+
+# --- Testing ---
+pytest==8.2.0
+pytest-cov==5.0.0
+pytest-mock==3.14.0
+responses==0.25.3         # mock HTTP calls (Sheets API etc.)
+factory-boy==3.3.0        # test data factories
+Faker==25.1.0             # realistic fake data
+
+# --- Security scanning ---
+bandit==1.7.8
+detect-secrets==1.4.0
+
+# --- Pre-commit ---
+pre-commit==3.7.1
+
+# --- Type checking (optional but recommended) ---
+mypy==1.10.0
+types-Pillow

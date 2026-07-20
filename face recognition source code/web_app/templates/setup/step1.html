@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setup — Step 1: Institution Details | Single Shot AAS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0e1a; --card: #111827; --border: rgba(255,255,255,0.07);
+      --accent: #4f8ef7; --accent2: #7c3aed; --text: #f1f5f9; --muted: #94a3b8;
+      --input-bg: rgba(255,255,255,0.04); --green: #10b981;
+    }
+    html, body { min-height:100vh; background:var(--bg); font-family:'Outfit',sans-serif; color:var(--text); }
+    body { display:flex; flex-direction:column; align-items:center; padding:2rem 1rem; gap:2rem; }
+    body::before {
+      content:''; position:fixed; inset:0;
+      background: radial-gradient(ellipse 70% 50% at 20% 20%, rgba(79,142,247,.08) 0%, transparent 60%),
+                  radial-gradient(ellipse 50% 60% at 80% 80%, rgba(124,58,237,.07) 0%, transparent 60%);
+      pointer-events:none;
+    }
+
+    /* ── Progress bar ── */
+    .progress-wrap { width:100%; max-width:560px; position:relative; z-index:1; }
+    .progress-steps { display:flex; align-items:center; gap:0; }
+    .step-dot {
+      width:32px; height:32px; border-radius:50%; border:2px solid var(--border);
+      display:flex; align-items:center; justify-content:center;
+      font-size:.75rem; font-weight:600; color:var(--muted); flex-shrink:0;
+      background: var(--card);
+    }
+    .step-dot.active { border-color:var(--accent); color:var(--accent); background:rgba(79,142,247,.12); }
+    .step-dot.done { border-color:var(--green); color:#fff; background:var(--green); }
+    .step-line { flex:1; height:2px; background:var(--border); }
+    .step-line.done { background: var(--green); }
+    .step-labels { display:flex; justify-content:space-between; margin-top:.5rem; padding:0 4px; }
+    .step-label { font-size:.67rem; color:var(--muted); text-align:center; width:80px; }
+    .step-label.active { color:var(--accent); }
+
+    /* ── Card ── */
+    .card {
+      background:var(--card); border:1px solid var(--border); border-radius:20px;
+      padding:2.5rem 2.8rem; width:100%; max-width:560px;
+      display:flex; flex-direction:column; gap:1.5rem;
+      box-shadow:0 0 60px rgba(0,0,0,.5); position:relative; z-index:1;
+      animation: slideUp .4s ease forwards;
+    }
+    @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+    .card-header h2 { font-size:1.5rem; font-weight:700; }
+    .card-header p  { font-size:.85rem; color:var(--muted); margin-top:.3rem; }
+
+    /* ── Form ── */
+    .form-grid { display:grid; gap:1rem; }
+    .form-group { display:flex; flex-direction:column; gap:.4rem; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    label { font-size:.8rem; font-weight:500; color:var(--muted); }
+    input, textarea {
+      background:var(--input-bg); border:1px solid var(--border); border-radius:10px;
+      padding:.7rem 1rem; color:var(--text); font-family:'Outfit',sans-serif;
+      font-size:.92rem; outline:none; width:100%;
+      transition:border-color .2s, box-shadow .2s;
+    }
+    input:focus, textarea:focus {
+      border-color:var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,142,247,.15);
+    }
+    textarea { resize:vertical; min-height:70px; }
+
+    /* ── Button ── */
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+      padding:.8rem 2rem; border-radius:12px; font-size:.95rem;
+      font-family:'Outfit',sans-serif; font-weight:600; cursor:pointer; border:none;
+      transition:transform .15s, box-shadow .15s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color:#fff;
+      box-shadow: 0 4px 20px rgba(79,142,247,.35);
+    }
+    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(79,142,247,.45); }
+    .btn-primary:active { transform:translateY(0); }
+    .btn-actions { display:flex; justify-content:flex-end; gap:1rem; margin-top:.5rem; }
+
+    /* ── Flash ── */
+    .flash-error {
+      background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3);
+      border-radius:10px; padding:.75rem 1rem; font-size:.82rem; color:#fca5a5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Progress indicator -->
+  <div class="progress-wrap">
+    <div class="progress-steps">
+      <div class="step-dot active">1</div>
+      <div class="step-line"></div>
+      <div class="step-dot">2</div>
+      <div class="step-line"></div>
+      <div class="step-dot">3</div>
+      <div class="step-line"></div>
+      <div class="step-dot">✓</div>
+    </div>
+    <div class="step-labels">
+      <span class="step-label active">Institution</span>
+      <span class="step-label">Section</span>
+      <span class="step-label">Cameras</span>
+      <span class="step-label">Done</span>
+    </div>
+  </div>
+
+  <!-- Form card -->
+  <div class="card">
+    <div class="card-header">
+      <h2>🏫 Institution Details</h2>
+      <p>We'll save this information to your Google Drive for future reference.</p>
+    </div>
+
+    {% if error %}
+    <div class="flash-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/api/setup/save-institution" id="step1Form" class="form-grid">
+      <div class="form-group">
+        <label for="institution_name">Institution / Organization Name *</label>
+        <input id="institution_name" name="institution_name" type="text"
+               placeholder="e.g. ABC College of Engineering"
+               value="{{ form.institution_name or '' }}" required />
+      </div>
+
+      <div class="form-group">
+        <label for="address">Full Address *</label>
+        <textarea id="address" name="address"
+                  placeholder="Street address, landmark...">{{ form.address or '' }}</textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="city">City *</label>
+          <input id="city" name="city" type="text" placeholder="e.g. Chennai"
+                 value="{{ form.city or '' }}" required />
+        </div>
+        <div class="form-group">
+          <label for="state">State *</label>
+          <input id="state" name="state" type="text" placeholder="e.g. Tamil Nadu"
+                 value="{{ form.state or '' }}" required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="contact_email">Contact Email *</label>
+        <input id="contact_email" name="contact_email" type="email"
+               placeholder="admin@college.edu"
+               value="{{ form.contact_email or '' }}" required />
+      </div>
+
+      <div class="btn-actions">
+        <button type="submit" class="btn btn-primary" id="nextBtn">
+          Next → Create Sections
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('step1Form').addEventListener('submit', function() {
+      var btn = document.getElementById('nextBtn');
+      btn.textContent = 'Saving…';
+      btn.disabled = true;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+# ============================================================
+#  .gitignore — AI Attendance System
+# ============================================================
+
+# ── Secrets (NEVER commit these) ─────────────────────────────────────────────
+.env
+credentials.json
+token.json
+service_account.json
+
+# ── Student Data (personal data — keep local only) ────────────────────────────
+known face photos/
+known face encodings/
+captured/
+
+# ── Vosk Voice Model (large binary, download separately) ──────────────────────
+vosk-model-*/
+
+# ── Python Cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Virtual Environment ───────────────────────────────────────────────────────
+venv/
+env/
+.venv/
+.env/
+
+# ── OS / Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml
+
+# ── Pickle / Binary encodings ─────────────────────────────────────────────────
+*.pkl
+*.pickle
+
+# ── Log files ─────────────────────────────────────────────────────────────────
+*.log
+logs/

@@ -1,0 +1,116 @@
+# =============================================================================
+#  docker-compose.yml — AI Attendance System
+#
+#  Services:
+#    app       - Flask web dashboard (main service)
+#    redis     - Task queue broker (prepared for async jobs)
+#    [future]  - celery-worker, postgres, nginx
+#
+#  Usage:
+#    docker compose up --build         → build + start all services
+#    docker compose up -d              → start in background
+#    docker compose logs -f app        → stream logs
+#    docker compose exec app bash      → shell into container
+#    docker compose down -v            → stop + remove volumes
+# =============================================================================
+
+name: attendance-system
+
+services:
+  # ── Flask Web App ───────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: attendance-system:dev
+    container_name: attendance-app
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5000}:5000"
+    env_file:
+      - "face recognition source code/.env"
+    environment:
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=5000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Source code (live reload in dev — remove for prod)
+      - "./face recognition source code:/app/src:ro"
+      # Persistent data volumes
+      - known_face_photos:/app/known_face_photos
+      - known_face_encodings:/app/known_face_encodings
+      - captured_images:/app/captured
+      # Google Cloud credentials (never bake into image)
+      - "./face recognition source code/credentials.json:/app/src/credentials.json:ro"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 25s
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - attendance-net
+    # Camera device passthrough (required for webcam on Linux host)
+    # Uncomment if using a local webcam:
+    # devices:
+    #   - /dev/video0:/dev/video0
+    deploy:
+      resources:
+        limits:
+          memory: 2g    # dlib + OpenCV are memory-hungry
+          cpus: "2.0"
+
+  # ── Redis (task queue + camera lock broker) ─────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: attendance-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - attendance-net
+    ports:
+      - "6379:6379"   # expose only for local dev debugging; remove in prod
+
+  # ── Nginx reverse proxy (production) ────────────────────────────────────────
+  # Uncomment to enable TLS termination + static file serving
+  # nginx:
+  #   image: nginx:1.25-alpine
+  #   container_name: attendance-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./nginx/certs:/etc/nginx/certs:ro
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - attendance-net
+
+# ── Named volumes (data persisted between container restarts) ─────────────────
+volumes:
+  known_face_photos:
+    driver: local
+  known_face_encodings:
+    driver: local
+  captured_images:
+    driver: local
+  redis_data:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  attendance-net:
+    driver: bridge

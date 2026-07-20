@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Single Shot AAS — Dashboard</title>
+  <meta name="description" content="Single Shot AAS — AI-powered face recognition attendance system."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🎓</div>
+    <div class="logo-text">
+      <span class="logo-title">Single Shot AAS</span>
+      <span class="logo-version">v2.0</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a class="nav-item active" id="nav-dashboard"  onclick="showSection('dashboard')">
+      <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+    </a>
+    <a class="nav-item" id="nav-attendance" onclick="showSection('attendance')">
+      <span class="nav-icon">📷</span><span class="nav-label">Take Attendance</span>
+    </a>
+    <a class="nav-item" id="nav-enroll"     onclick="showSection('enroll')">
+      <span class="nav-icon">➕</span><span class="nav-label">Enroll Student</span>
+    </a>
+    <a class="nav-item" id="nav-students"   onclick="showSection('students')">
+      <span class="nav-icon">👥</span><span class="nav-label">Students</span>
+    </a>
+    <a class="nav-item" id="nav-history"    onclick="showSection('history')">
+      <span class="nav-icon">📋</span><span class="nav-label">Attendance Log</span>
+    </a>
+    <a class="nav-item" id="nav-reports"    onclick="showSection('reports')">
+      <span class="nav-icon">📈</span><span class="nav-label">Reports</span>
+    </a>
+    <a class="nav-item" id="nav-settings"   onclick="showSection('settings')">
+      <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-status" id="sidebarStatus">
+    <div class="status-dot-wrap"><span class="status-dot" id="sdot"></span><span id="sstatusText">Checking...</span></div>
+  </div>
+</aside>
+
+<!-- ══ MAIN CONTENT ═════════════════════════════════════════════════════════ -->
+<div class="layout">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    <h1 class="topbar-title" id="pageTitle">Dashboard</h1>
+      <div class="topbar-right">
+        <span class="topbar-time" id="topbarTime"></span>
+        <div class="creds-badge" id="credsBadge" title="Google account status">⚡</div>
+        <span id="topbarUser" style="font-size:.8rem;color:var(--muted);margin-left:.5rem;"></span>
+        <a href="/logout" style="font-size:.78rem;color:var(--muted);text-decoration:none;margin-left:.75rem;" title="Sign out">⎋ Logout</a>
+      </div>
+  </header>
+
+  <main class="main-content">
+
+    <!-- ══ SECTION: DASHBOARD ══════════════════════════════════════════════ -->
+    <section id="sec-dashboard" class="section active">
+      <div class="stats-grid">
+        <div class="stat-card" id="sc-enrolled">
+          <div class="stat-icon">👥</div>
+          <div class="stat-body">
+            <div class="stat-num" id="d-enrolled">—</div>
+            <div class="stat-lbl">Students Enrolled</div>
+          </div>
+        </div>
+        <div class="stat-card green" id="sc-present">
+          <div class="stat-icon">✅</div>
+          <div class="stat-body">
+            <div class="stat-num" id="d-present">—</div>
+            <div class="stat-lbl">Present Today</div>
+          </div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-icon">⏰</div>
+          <div class="stat-body">
+            <div class="stat-num" id="d-absent">—</div>
+            <div class="stat-lbl">Absent Today</div>
+          </div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-icon">🔬</div>
+          <div class="stat-body">
+            <div class="stat-num" id="d-encodings">—</div>
+            <div class="stat-lbl">Encodings Loaded</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="panel">
+        <h2 class="panel-title">Quick Actions</h2>
+        <div class="quick-actions">
+          <button class="qa-btn" onclick="showSection('attendance')">
+            <span>📷</span><span>Take Attendance</span>
+          </button>
+          <button class="qa-btn" onclick="showSection('enroll')">
+            <span>➕</span><span>Enroll Student</span>
+          </button>
+          <button class="qa-btn" onclick="showSection('students')">
+            <span>👥</span><span>View Students</span>
+          </button>
+          <button class="qa-btn" onclick="showSection('history')">
+            <span>📋</span><span>Today's Log</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- System Status Panel -->
+      <div class="panel">
+        <h2 class="panel-title">System Status</h2>
+        <div class="status-grid" id="sysStatusGrid">
+          <div class="status-row"><span class="s-label">Camera</span><span class="s-val" id="ss-camera">—</span></div>
+          <div class="status-row"><span class="s-label">Google Sheets</span><span class="s-val" id="ss-sheets">—</span></div>
+          <div class="status-row"><span class="s-label">Face Encodings</span><span class="s-val" id="ss-enc">—</span></div>
+          <div class="status-row"><span class="s-label">Recognition Tolerance</span><span class="s-val" id="ss-tol">—</span></div>
+          <div class="status-row"><span class="s-label">Max In Time</span><span class="s-val" id="ss-time">—</span></div>
+        </div>
+      </div>
+
+      <!-- Multi-Camera Grid -->
+      <div class="panel" id="cameraGridPanel">
+        <div class="panel-header">
+          <h2 class="panel-title">📷 Classroom Cameras</h2>
+          <div class="panel-actions">
+            <button class="btn btn-sm" onclick="loadCameraGrid()">🔄 Refresh</button>
+            <button class="btn btn-primary btn-sm" onclick="takeAllAttendance()" id="btnTakeAll">⚡ All Cameras</button>
+          </div>
+        </div>
+        <div id="cameraGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:.75rem;">
+          <div class="empty-state" id="cameraGridEmpty"><span>📷</span><p>No cameras registered. <a href="/setup/step3" style="color:var(--accent);">Configure cameras →</a></p></div>
+        </div>
+      </div>
+
+      <!-- Last Snapshot -->
+      <div class="panel" id="lastSnapshotPanel" style="display:none">
+        <h2 class="panel-title">Last Classroom Snapshot</h2>
+        <img id="lastSnapshotImg" class="snapshot-img" src="" alt="Last classroom snapshot"/>
+      </div>
+    </section>
+
+    <!-- ══ SECTION: ATTENDANCE ═════════════════════════════════════════════ -->
+    <section id="sec-attendance" class="section">
+      <div class="two-col">
+
+        <!-- Left: Capture modes -->
+        <div class="panel">
+          <h2 class="panel-title">Capture Mode</h2>
+          <div class="tab-bar">
+            <button class="tab active" id="tab-cam"    onclick="switchTab('cam')">📷 Camera</button>
+            <button class="tab"        id="tab-upload" onclick="switchTab('upload')">📱 Upload Photo</button>
+            <button class="tab"        id="tab-stream" onclick="switchTab('stream')">🔴 Live Stream</button>
+          </div>
+
+          <!-- Camera tab -->
+          <div id="atab-cam" class="atab">
+            <div class="form-group" style="margin-bottom:.75rem;">
+              <label class="form-label">📷 Camera / Section</label>
+              <select class="form-input" id="atCameraSelect" style="max-width:380px;">
+                <option value="">Default (env / single camera)</option>
+              </select>
+            </div>
+            <p class="hint">Triggers the selected classroom camera instantly and runs face recognition on the captured frame.</p>
+            <button class="btn btn-primary btn-full" id="btnCamera" onclick="triggerCamera()">
+              <span>⚡</span> Take Attendance Now
+            </button>
+          </div>
+
+          <!-- Upload tab -->
+          <div id="atab-upload" class="atab" style="display:none">
+            <p class="hint">Take a photo on your phone and upload it. Perfect when the fixed camera is unavailable.</p>
+            <label class="upload-zone" for="atPhotoUpload" id="uploadZone">
+              <span class="upload-icon">📤</span>
+              <span>Click or drag a classroom photo here</span>
+              <span class="upload-sub">JPG, PNG supported</span>
+            </label>
+            <input type="file" id="atPhotoUpload" accept="image/*" capture="environment" onchange="uploadAttendancePhoto(this)"/>
+          </div>
+
+          <!-- Live Stream tab -->
+          <div id="atab-stream" class="atab" style="display:none">
+            <p class="hint">Live feed from the configured camera. Use this to check framing before taking attendance.</p>
+            <div class="stream-container">
+              <img id="streamImg" class="stream-img" src="" alt="Camera stream"/>
+              <button class="btn btn-sm" onclick="startStream()" id="btnStartStream">▶ Start Stream</button>
+              <button class="btn btn-sm btn-danger" onclick="stopStream()" id="btnStopStream" style="display:none">⏹ Stop</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Results -->
+        <div class="panel">
+          <h2 class="panel-title">Results <span class="ts-badge" id="atTimestamp"></span></h2>
+          <div id="atResults" class="results-placeholder">
+            <span class="placeholder-icon">🔍</span>
+            <p>Attendance results will appear here after capture.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Full-width annotated image -->
+      <div class="panel" id="annotatedPanel" style="display:none">
+        <h2 class="panel-title">Annotated Classroom Photo
+          <button class="btn btn-sm" onclick="downloadAnnotated()">⬇ Download</button>
+        </h2>
+        <img id="annotatedImg" class="annotated-img" src="" alt="Annotated classroom photo"/>
+        <p class="img-caption">🟢 Green = Recognized · 🔴 Red = Unknown</p>
+      </div>
+    </section>
+
+    <!-- ══ SECTION: ENROLL ═════════════════════════════════════════════════ -->
+    <section id="sec-enroll" class="section">
+      <div class="tab-bar">
+        <button class="tab active" id="etab-webcam-btn"  onclick="switchEnrollTab('webcam')">🎥 Webcam (3 Angles)</button>
+        <button class="tab"        id="etab-upload-btn"  onclick="switchEnrollTab('upload')">📁 Upload Photos</button>
+      </div>
+
+      <!-- ── Webcam Enrollment ── -->
+      <div id="etab-webcam">
+        <div class="two-col">
+          <div class="panel">
+            <h2 class="panel-title">Student Details</h2>
+            <div class="form-group">
+              <label class="form-label">Full Name *</label>
+              <input class="form-input" id="ewName" type="text" placeholder="e.g. John Doe" oninput="validateEnrollForm()"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email Address</label>
+              <input class="form-input" id="ewEmail" type="email" placeholder="e.g. john@college.edu"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gender</label>
+              <select class="form-input" id="ewGender" style="max-width:180px;">
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="O">Other</option>
+              </select>
+            </div>
+            <div class="angle-progress" id="angleProgress">
+              <div class="angle-step" id="astep-front">
+                <div class="astep-icon">😐</div>
+                <div class="astep-label">FRONT</div>
+                <div class="astep-status" id="as-front">Pending</div>
+              </div>
+              <div class="angle-step" id="astep-left">
+                <div class="astep-icon">👈</div>
+                <div class="astep-label">LEFT</div>
+                <div class="astep-status" id="as-left">Pending</div>
+              </div>
+              <div class="angle-step" id="astep-right">
+                <div class="astep-icon">👉</div>
+                <div class="astep-label">RIGHT</div>
+                <div class="astep-status" id="as-right">Pending</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2 class="panel-title" id="enrollAngleTitle">Step 1 of 3 — Look FRONT</h2>
+            <div class="webcam-wrap">
+              <video id="ewVideo" class="webcam-feed" autoplay playsinline muted></video>
+              <canvas id="ewCanvas" style="display:none"></canvas>
+              <div class="webcam-overlay" id="ewOverlay">
+                <button class="btn btn-primary" onclick="startWebcamEnroll()" id="btnStartWebcam">▶ Start Camera</button>
+              </div>
+            </div>
+            <div class="webcam-controls" id="ewControls" style="display:none">
+              <button class="btn btn-primary" id="btnCapture" onclick="captureAngle()">📸 Capture This Angle</button>
+              <button class="btn btn-danger"  onclick="stopWebcamEnroll()">✕ Cancel</button>
+            </div>
+            <div class="progress-bar-wrap" id="ewProgress" style="display:none">
+              <div class="progress-bar" id="ewProgressBar" style="width:0%"></div>
+            </div>
+            <button class="btn btn-success btn-full" id="btnFinalize" onclick="finalizeEnrollment()" style="display:none">
+              ✅ Complete Enrollment
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Upload Enrollment ── -->
+      <div id="etab-upload" style="display:none">
+        <div class="two-col">
+          <div class="panel">
+            <h2 class="panel-title">Student Details</h2>
+            <div class="form-group">
+              <label class="form-label">Full Name *</label>
+              <input class="form-input" id="euName" type="text" placeholder="e.g. Jane Smith"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email Address</label>
+              <input class="form-input" id="euEmail" type="email" placeholder="e.g. jane@college.edu"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Gender</label>
+              <select class="form-input" id="euGender" style="max-width:180px;">
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="O">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Upload Photos (1–3 photos, different angles)</label>
+              <label class="upload-zone" for="euPhotos">
+                <span class="upload-icon">📁</span>
+                <span id="euPhotoLabel">Click to select photos</span>
+                <span class="upload-sub">Best: Front, Left, Right angles</span>
+              </label>
+              <input type="file" id="euPhotos" accept="image/*" multiple onchange="previewUploadPhotos(this)"/>
+            </div>
+            <div class="photo-previews" id="euPreviews"></div>
+            <button class="btn btn-primary btn-full" onclick="enrollViaUpload()" id="btnEnrollUpload">
+              ➕ Enroll Student
+            </button>
+          </div>
+          <div class="panel">
+            <h2 class="panel-title">💡 Photo Tips</h2>
+            <ul class="tips-list">
+              <li>Use a clear, well-lit photo</li>
+              <li>Face should be clearly visible</li>
+              <li>Upload 3 photos from different angles for best accuracy</li>
+              <li>Avoid sunglasses or masks</li>
+              <li>Plain background works best</li>
+              <li>Photo should be at least 200×200 pixels</li>
+            </ul>
+            <div class="panel info-panel">
+              <strong>Angle Guide:</strong>
+              <div class="angle-guide">
+                <div class="ag-item">😐<br/><small>Front</small></div>
+                <div class="ag-item">😶‍🌫️<br/><small>Left</small></div>
+                <div class="ag-item">🫤<br/><small>Right</small></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SECTION: STUDENTS ════════════════════════════════════════════════ -->
+    <section id="sec-students" class="section">
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Enrolled Students <span class="count-badge" id="studentCountBadge">0</span></h2>
+          <div class="panel-actions">
+            <input class="search-input" id="studentSearch" placeholder="🔍 Search students..." oninput="filterStudents()"/>
+            <button class="btn btn-primary btn-sm" onclick="showSection('enroll')">➕ Enroll New</button>
+          </div>
+        </div>
+        <div class="student-grid" id="studentGrid">
+          <div class="empty-state"><span>👥</span><p>No students enrolled yet.</p><button class="btn btn-primary" onclick="showSection('enroll')">Enroll First Student</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SECTION: HISTORY ════════════════════════════════════════════════ -->
+    <section id="sec-history" class="section">
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Attendance Log — Today</h2>
+          <div class="panel-actions">
+            <button class="btn btn-sm" onclick="loadTodayAttendance()">🔄 Refresh</button>
+            <button class="btn btn-sm" onclick="exportCSV()">⬇ Export CSV</button>
+          </div>
+        </div>
+        <div id="historyContent">
+          <div class="empty-state"><span>📋</span><p>Loading attendance data...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SECTION: REPORTS ════════════════════════════════════════════════ -->
+    <section id="sec-reports" class="section">
+      <div class="panel">
+        <h2 class="panel-title">Attendance Summary</h2>
+        <p class="hint">Attendance percentage for each enrolled student based on today's records.</p>
+        <div id="reportsContent">
+          <div class="empty-state"><span>📈</span><p>Load attendance data to generate reports.</p><button class="btn btn-primary" onclick="loadReports()">Generate Report</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SECTION: SETTINGS ═══════════════════════════════════════════════ -->
+    <section id="sec-settings" class="section">
+      <div class="two-col">
+        <div class="panel">
+          <h2 class="panel-title">Recognition Settings</h2>
+
+          <div class="form-group">
+            <label class="form-label">Recognition Tolerance <span class="badge-val" id="tolVal">0.55</span></label>
+            <input type="range" class="slider" id="setTolerance" min="0.3" max="0.7" step="0.01" value="0.55" oninput="document.getElementById('tolVal').textContent=this.value"/>
+            <div class="slider-hints"><span>Strict (0.3)</span><span>Default (0.55)</span><span>Lenient (0.7)</span></div>
+            <p class="hint">Lower = fewer false matches. Higher = catches more students but may misidentify.</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Image Scale <span class="badge-val" id="scaleVal">0.25</span></label>
+            <input type="range" class="slider" id="setScale" min="0.1" max="1.0" step="0.05" value="0.25" oninput="document.getElementById('scaleVal').textContent=this.value"/>
+            <div class="slider-hints"><span>Fast (0.1)</span><span>Balanced (0.25)</span><span>Accurate (1.0)</span></div>
+            <p class="hint">Higher scale = more accurate but slower. Increase if back-row faces are missed.</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Attendance Cutoff Time</label>
+            <input class="form-input" id="setMaxTime" type="time" value="16:00"/>
+            <p class="hint">Students arriving after this time will be marked 'late' instead of 'present'.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2 class="panel-title">Camera Settings</h2>
+
+          <div class="form-group">
+            <label class="form-label">IP Camera URL (RTSP)</label>
+            <input class="form-input" id="setCameraUrl" type="text" placeholder="rtsp://admin:password@192.168.1.50:554/stream"/>
+            <p class="hint">Leave blank to use local webcam. Format: rtsp://user:pass@ip:port/stream</p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Webcam Index</label>
+            <input class="form-input" id="setWebcamIdx" type="number" min="0" max="5" value="0"/>
+            <p class="hint">0 = default webcam, 1 = second camera, etc.</p>
+          </div>
+
+          <h2 class="panel-title" style="margin-top:24px">Voice Command</h2>
+          <div class="form-group">
+            <label class="form-label">Trigger Phrase</label>
+            <input class="form-input" id="setVoicePhrase" type="text" placeholder="take attendance"/>
+            <p class="hint">Say this phrase to trigger attendance capture in --voice mode.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Credentials Status -->
+      <div class="panel">
+        <h2 class="panel-title">Google Cloud Credentials</h2>
+        <div id="credsStatus" class="creds-info"></div>
+        <div class="creds-steps">
+          <div class="step-item"><span class="step-num">1</span><span>Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a></span></div>
+          <div class="step-item"><span class="step-num">2</span><span>IAM & Admin → Service Accounts → Create Service Account</span></div>
+          <div class="step-item"><span class="step-num">3</span><span>Keys → Add Key → JSON → Download</span></div>
+          <div class="step-item"><span class="step-num">4</span><span>Save as <code>credentials.json</code> inside <code>face recognition source code/</code></span></div>
+          <div class="step-item"><span class="step-num">5</span><span>Share your Google Sheet with the service account email</span></div>
+        </div>
+      </div>
+
+      <!-- Save Settings -->
+      <div style="display:flex; justify-content:flex-end; margin-top:4px;">
+        <button class="btn btn-primary" id="btnSaveSettings" onclick="saveSettings()" style="min-width:180px;">
+          💾 Save Settings
+        </button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ══ LOADING OVERLAY ════════════════════════════════════════════════════════ -->
+<div class="loading-overlay" id="loadingOverlay" style="display:none">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <p id="loadingText">Processing...</p>
+    <p class="loading-sub" id="loadingSub">Please wait</p>
+  </div>
+</div>
+
+<!-- ══ TOAST NOTIFICATIONS ════════════════════════════════════════════════════ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ══ CONFIRM MODAL ══════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="confirmModal" style="display:none">
+  <div class="modal">
+    <h3 id="confirmTitle">Confirm</h3>
+    <p id="confirmMsg"></p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="confirmOk">Delete</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════════════════
+let currentSection = 'dashboard';
+let webcamStream   = null;
+let enrollAngles   = { front: false, left: false, right: false };
+let currentAngleIdx = 0;
+const ANGLE_ORDER  = ['front', 'left', 'right'];
+const ANGLE_LABELS = { front: '😐 Look STRAIGHT at the camera', left: '👈 Turn head slightly LEFT', right: '👉 Turn head slightly RIGHT' };
+let currentEnrollName = '';
+let allStudentsData   = [];
+let streamActive = false;
+let lastAnnotatedSrc  = '';
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════════
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  document.getElementById('nav-' + id).classList.add('active');
+  currentSection = id;
+  const titles = { dashboard:'Dashboard', attendance:'Take Attendance', enroll:'Enroll Student', students:'Students', history:'Attendance Log', reports:'Reports', settings:'Settings' };
+  document.getElementById('pageTitle').textContent = titles[id] || id;
+  // Section-specific loads
+  if (id === 'students')  loadStudents();
+  if (id === 'history')   loadTodayAttendance();
+  if (id === 'reports')   loadReports();
+  if (id === 'settings')  loadSettings();
+  if (id === 'dashboard') loadDashboard();
+  stopStream();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  document.querySelector('.layout').classList.toggle('sidebar-collapsed');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CLOCK
+// ═══════════════════════════════════════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  document.getElementById('topbarTime').textContent =
+    now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    + '  ' + now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TOAST NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+function toast(msg, type = 'info', dur = 4000) {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warn: '⚠️' };
+  t.innerHTML = `<span class="t-icon">${icons[type]||'ℹ️'}</span><span>${msg}</span><button onclick="this.parentNode.remove()">✕</button>`;
+  c.appendChild(t);
+  setTimeout(() => t.classList.add('show'), 10);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, dur);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LOADING OVERLAY
+// ═══════════════════════════════════════════════════════════════════════════
+function showLoading(text = 'Processing...', sub = 'Please wait') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loadingSub').textContent  = sub;
+  document.getElementById('loadingOverlay').style.display = 'flex';
+}
+function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+let _confirmCb = null;
+function confirm(title, msg, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent   = msg;
+  document.getElementById('confirmModal').style.display = 'flex';
+  _confirmCb = cb;
+  document.getElementById('confirmOk').onclick = () => { closeModal(); cb(); };
+}
+function closeModal() { document.getElementById('confirmModal').style.display = 'none'; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STATUS CHECK
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadStatus() {
+  try {
+    const d = await (await fetch('/api/status')).json();
+    // Sidebar dot
+    document.getElementById('sdot').className = 'status-dot online';
+    document.getElementById('sstatusText').textContent = `${d.students_enrolled} students`;
+    // Creds badge
+    const cb = document.getElementById('credsBadge');
+    cb.textContent   = d.credentials_ok ? '🟢' : '🔴';
+    cb.title         = d.credentials_ok ? 'Google Sheets connected' : 'credentials.json missing';
+    // System status panel
+    document.getElementById('ss-camera').innerHTML  = `<span class="badge blue">${d.camera_mode}</span>`;
+    document.getElementById('ss-sheets').innerHTML  = d.credentials_ok
+      ? '<span class="badge green">Connected</span>'
+      : '<span class="badge red">No credentials.json</span>';
+    document.getElementById('ss-enc').textContent   = `${d.encodings_loaded} encoding(s)`;
+    document.getElementById('ss-tol').textContent   = d.tolerance;
+    document.getElementById('ss-time').textContent  = '16:00:00';
+    // Dashboard stats
+    document.getElementById('d-enrolled').textContent  = d.students_enrolled;
+    document.getElementById('d-encodings').textContent = d.encodings_loaded;
+    // Creds panel in settings
+    const cd = document.getElementById('credsStatus');
+    if (cd) {
+      cd.innerHTML = d.credentials_ok
+        ? '<div class="badge-row"><span class="badge green large">✅ credentials.json Found</span><span>Google Sheets sync is active</span></div>'
+        : '<div class="badge-row"><span class="badge red large">❌ credentials.json Missing</span><span>Face recognition still works. Sheets sync disabled.</span></div>';
+    }
+    return d;
+  } catch {
+    document.getElementById('sdot').className = 'status-dot offline';
+    document.getElementById('sstatusText').textContent = 'Server offline';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  await loadStatus();
+  // Try to load today's attendance for present/absent counts
+  try {
+    const d = await (await fetch('/api/attendance/today')).json();
+    if (d.status === 'success' && d.records.length > 0) {
+      const present = d.records.filter(r => r.status === 'present').length;
+      const absent  = d.records.filter(r => r.status === 'absent' || !r.status).length;
+      document.getElementById('d-present').textContent = present;
+      document.getElementById('d-absent').textContent  = absent;
+    }
+  } catch { /* no creds — skip */ }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ATTENDANCE CAPTURE
+// ═══════════════════════════════════════════════════════════════════════════
+function switchTab(tab) {
+  ['cam','upload','stream'].forEach(t => {
+    document.getElementById(`atab-${t}`).style.display = t === tab ? 'block' : 'none';
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+  });
+  if (tab !== 'stream') stopStream();
+}
+
+async function triggerCamera(camId) {
+  const selectedCam = camId || document.getElementById('atCameraSelect').value || '';
+  showLoading('Capturing from camera...', 'Detecting and recognizing faces');
+  document.getElementById('btnCamera').disabled = true;
+  try {
+    const body = selectedCam ? JSON.stringify({ camera_id: selectedCam }) : JSON.stringify({});
+    const d = await (await fetch('/take-attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body
+    })).json();
+    hideLoading();
+    if (d.status === 'success') {
+      showAttendanceResults(d);
+      if (!d.sheet_synced) toast('Attendance taken ✓ (Google Sheets not synced — log in at /auth/google)', 'warn');
+      else toast(`Attendance recorded: ${d.present.length} present (Boys:${d.boys_count||0} Girls:${d.girls_count||0})`, 'success');
+      loadCameraGrid();  // refresh camera grid counts
+    } else {
+      toast(`Error: ${d.message}`, 'error');
+    }
+  } catch (e) { hideLoading(); toast('Server error: ' + e.message, 'error'); }
+  document.getElementById('btnCamera').disabled = false;
+}
+
+async function uploadAttendancePhoto(input) {
+  if (!input.files[0]) return;
+  showLoading('Processing uploaded photo...', 'Running face recognition');
+  const fd = new FormData(); fd.append('photo', input.files[0]);
+  try {
+    const d = await (await fetch('/upload-photo', { method:'POST', body:fd })).json();
+    hideLoading();
+    if (d.status === 'success') {
+      showAttendanceResults(d);
+      toast(`Photo processed: ${d.present.length} student(s) recognized`, 'success');
+    } else toast(`Error: ${d.message}`, 'error');
+  } catch(e) { hideLoading(); toast('Upload failed', 'error'); }
+  input.value = '';
+}
+
+function showAttendanceResults(d) {
+  document.getElementById('atTimestamp').textContent = d.timestamp || '';
+  const present = d.present || [];
+  const el = document.getElementById('atResults');
+  const sheetNote = d.sheet_synced === false
+    ? `<div class="warn-bar">⚠️ Google Sheets sync unavailable — add credentials.json to enable</div>` : '';
+  el.innerHTML = `
+    ${sheetNote}
+    <div class="result-stats">
+      <div class="rs-item green"><div class="rs-num">${present.length}</div><div>Present</div></div>
+      <div class="rs-item red"><div class="rs-num">${d.unknown_count}</div><div>Unknown</div></div>
+      <div class="rs-item blue"><div class="rs-num">${d.total_faces}</div><div>Faces</div></div>
+    </div>
+    <div class="name-chips">
+      ${present.length ? present.map(n => `<div class="chip green-chip">✓ ${n.replace(/_/g,' ')}</div>`).join('') : '<p class="muted">No students recognized.</p>'}
+    </div>`;
+  // Show annotated image
+  if (d.annotated_img) {
+    lastAnnotatedSrc = d.annotated_img + '?t=' + Date.now();
+    document.getElementById('annotatedImg').src = lastAnnotatedSrc;
+    document.getElementById('annotatedPanel').style.display = 'block';
+  }
+  // Update dashboard too
+  document.getElementById('d-present').textContent = present.length;
+}
+
+function downloadAnnotated() {
+  if (!lastAnnotatedSrc) return;
+  const a = document.createElement('a'); a.href = lastAnnotatedSrc;
+  a.download = 'attendance_' + Date.now() + '.jpg'; a.click();
+}
+
+// ── Camera Stream ──────────────────────────────────────────────────────────
+function startStream() {
+  streamActive = true;
+  document.getElementById('streamImg').src = '/api/camera/stream';
+  document.getElementById('btnStartStream').style.display = 'none';
+  document.getElementById('btnStopStream').style.display  = 'inline-flex';
+}
+function stopStream() {
+  streamActive = false;
+  const img = document.getElementById('streamImg');
+  if (img) img.src = '';
+  const bs = document.getElementById('btnStartStream');
+  const bst = document.getElementById('btnStopStream');
+  if (bs)  bs.style.display  = 'inline-flex';
+  if (bst) bst.style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ENROLLMENT
+// ═══════════════════════════════════════════════════════════════════════════
+function switchEnrollTab(tab) {
+  document.getElementById('etab-webcam').style.display = tab === 'webcam' ? 'block' : 'none';
+  document.getElementById('etab-upload').style.display = tab === 'upload' ? 'block' : 'none';
+  document.getElementById('etab-webcam-btn').classList.toggle('active', tab === 'webcam');
+  document.getElementById('etab-upload-btn').classList.toggle('active', tab === 'upload');
+  if (tab !== 'webcam') stopWebcamEnroll();
+}
+
+function validateEnrollForm() {
+  const name = document.getElementById('ewName').value.trim();
+  document.getElementById('btnStartWebcam').disabled = !name;
+}
+
+// ── Webcam Enrollment ──────────────────────────────────────────────────────
+async function startWebcamEnroll() {
+  const name = document.getElementById('ewName').value.trim();
+  if (!name) { toast('Please enter student name first', 'warn'); return; }
+  currentEnrollName  = name;
+  currentAngleIdx    = 0;
+  enrollAngles       = { front: false, left: false, right: false };
+  resetAngleSteps();
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width:640, height:480 } });
+    const v = document.getElementById('ewVideo');
+    v.srcObject = webcamStream;
+    document.getElementById('ewOverlay').style.display  = 'none';
+    document.getElementById('ewControls').style.display = 'flex';
+    document.getElementById('ewProgress').style.display = 'block';
+    updateAngleUI();
+  } catch(e) { toast('Cannot access camera: ' + e.message, 'error'); }
+}
+
+function stopWebcamEnroll() {
+  if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+  document.getElementById('ewOverlay').style.display  = 'flex';
+  document.getElementById('ewControls').style.display = 'none';
+  document.getElementById('ewProgress').style.display = 'none';
+  document.getElementById('btnFinalize').style.display = 'none';
+}
+
+function updateAngleUI() {
+  const angle  = ANGLE_ORDER[currentAngleIdx];
+  const pct    = (currentAngleIdx / 3) * 100;
+  document.getElementById('ewProgressBar').style.width = pct + '%';
+  document.getElementById('enrollAngleTitle').textContent = `Step ${currentAngleIdx+1} of 3 — ${ANGLE_LABELS[angle]}`;
+  ANGLE_ORDER.forEach((a, i) => {
+    const step = document.getElementById(`astep-${a}`);
+    step.classList.toggle('done',    enrollAngles[a]);
+    step.classList.toggle('current', !enrollAngles[a] && i === currentAngleIdx);
+  });
+}
+
+function resetAngleSteps() {
+  ANGLE_ORDER.forEach(a => {
+    document.getElementById(`as-${a}`).textContent = 'Pending';
+    document.getElementById(`astep-${a}`).className = 'angle-step';
+  });
+  document.getElementById('btnFinalize').style.display = 'none';
+}
+
+async function captureAngle() {
+  const angle = ANGLE_ORDER[currentAngleIdx];
+  const name  = currentEnrollName.replace(/\s+/g, '_');
+  const v     = document.getElementById('ewVideo');
+  const c     = document.getElementById('ewCanvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  const b64 = c.toDataURL('image/jpeg', 0.85);
+  document.getElementById('btnCapture').disabled = true;
+  try {
+    const res = await fetch('/api/enroll/webcam', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, angle, image: b64,
+        email: document.getElementById('ewEmail').value,
+        gender: document.getElementById('ewGender').value || 'M'
+      })
+    });
+    const d = await res.json();
+    if (d.status === 'no_face') {
+      toast(d.message, 'warn'); return;
+    }
+    enrollAngles[angle] = true;
+    document.getElementById(`as-${angle}`).textContent = '✓ Done';
+    document.getElementById(`astep-${angle}`).classList.add('done');
+    toast(`${angle.toUpperCase()} captured!`, 'success');
+    currentAngleIdx++;
+    if (currentAngleIdx < 3) {
+      updateAngleUI();
+    } else {
+      document.getElementById('ewProgressBar').style.width = '100%';
+      document.getElementById('enrollAngleTitle').textContent = '✅ All angles captured! Click Finalize.';
+      document.getElementById('ewControls').style.display = 'none';
+      document.getElementById('btnFinalize').style.display = 'block';
+      stopWebcamEnroll();
+    }
+  } catch(e) { toast('Capture failed: ' + e.message, 'error'); }
+  document.getElementById('btnCapture').disabled = false;
+}
+
+async function finalizeEnrollment() {
+  const name  = currentEnrollName.replace(/\s+/g, '_');
+  const email = document.getElementById('ewEmail').value;
+  showLoading('Finalizing enrollment...', 'Saving face data to memory');
+  try {
+    const res = await fetch('/api/enroll/webcam', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, angle: '', image: '', email,
+        gender: document.getElementById('ewGender').value || 'M',
+        finalize: true })
+    });
+    const d = await res.json();
+    hideLoading();
+    if (d.status === 'enrolled') {
+      toast(d.message, 'success');
+      document.getElementById('ewName').value  = '';
+      document.getElementById('ewEmail').value = '';
+      resetAngleSteps();
+      document.getElementById('btnFinalize').style.display = 'none';
+      loadStatus();
+    } else toast('Enrollment error: ' + d.message, 'error');
+  } catch(e) { hideLoading(); toast('Error: ' + e.message, 'error'); }
+}
+
+// ── Upload Enrollment ──────────────────────────────────────────────────────
+function previewUploadPhotos(input) {
+  const prev = document.getElementById('euPreviews');
+  prev.innerHTML = '';
+  const files = Array.from(input.files).slice(0, 3);
+  document.getElementById('euPhotoLabel').textContent = `${files.length} photo(s) selected`;
+  files.forEach((f, i) => {
+    const img = document.createElement('img');
+    img.className = 'preview-thumb';
+    img.src = URL.createObjectURL(f);
+    img.title = ['Front', 'Left', 'Right'][i] || `Photo ${i+1}`;
+    prev.appendChild(img);
+  });
+}
+
+async function enrollViaUpload() {
+  const name  = document.getElementById('euName').value.trim();
+  const email = document.getElementById('euEmail').value.trim();
+  const files = document.getElementById('euPhotos').files;
+  if (!name)  { toast('Student name is required', 'warn'); return; }
+  if (!files.length) { toast('Please select at least one photo', 'warn'); return; }
+  showLoading('Enrolling student...', 'Detecting and encoding faces');
+  const fd = new FormData();
+  fd.append('name', name);
+  fd.append('email', email);
+  fd.append('gender', document.getElementById('euGender').value || 'M');
+  Array.from(files).slice(0,3).forEach(f => fd.append('photos', f));
+  try {
+    const d = await (await fetch('/api/enroll/upload', { method:'POST', body:fd })).json();
+    hideLoading();
+    if (d.status === 'success') {
+      toast(d.message, 'success');
+      document.getElementById('euName').value  = '';
+      document.getElementById('euEmail').value = '';
+      document.getElementById('euPhotos').value = '';
+      document.getElementById('euPreviews').innerHTML = '';
+      document.getElementById('euPhotoLabel').textContent = 'Click to select photos';
+      loadStatus();
+    } else toast(`Enrollment failed: ${d.message}`, 'error');
+  } catch(e) { hideLoading(); toast('Error: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STUDENTS LIST
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadStudents() {
+  const grid = document.getElementById('studentGrid');
+  grid.innerHTML = '<div class="loading-inline"><div class="spinner-sm"></div> Loading students...</div>';
+  try {
+    const d = await (await fetch('/api/students')).json();
+    allStudentsData = d.students || [];
+    renderStudentGrid(allStudentsData);
+    document.getElementById('studentCountBadge').textContent = d.count;
+  } catch(e) { grid.innerHTML = `<div class="empty-state">❌ Error loading students: ${e.message}</div>`; }
+}
+
+function renderStudentGrid(students) {
+  const grid = document.getElementById('studentGrid');
+  if (!students.length) {
+    grid.innerHTML = `<div class="empty-state"><span>👥</span><p>No students enrolled yet.</p><button class="btn btn-primary" onclick="showSection('enroll')">Enroll First Student</button></div>`;
+    return;
+  }
+  grid.innerHTML = students.map(s => `
+    <div class="student-card" id="sc-${s.name}">
+      <div class="sc-photo">
+        ${s.photo ? `<img src="${s.photo}" alt="${s.display}" class="sc-img"/>` : `<div class="sc-avatar">${s.display.charAt(0).toUpperCase()}</div>`}
+      </div>
+      <div class="sc-info">
+        <div class="sc-name">${s.display}</div>
+        <div class="sc-meta">${s.angles} angle${s.angles !== 1 ? 's' : ''} enrolled</div>
+        <div class="sc-quality ${s.angles >= 3 ? 'quality-good' : s.angles >= 2 ? 'quality-ok' : 'quality-poor'}">
+          ${s.angles >= 3 ? '🟢 Excellent' : s.angles >= 2 ? '🟡 Good' : '🔴 Basic'}
+        </div>
+      </div>
+      <div class="sc-actions">
+        <button class="btn btn-sm btn-danger" onclick="deleteStudent('${s.name}','${s.display}')">🗑 Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+function filterStudents() {
+  const q = document.getElementById('studentSearch').value.toLowerCase();
+  renderStudentGrid(allStudentsData.filter(s => s.display.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)));
+}
+
+function deleteStudent(name, display) {
+  confirm('Remove Student', `Remove "${display}" and all their face data? This cannot be undone.`, async () => {
+    try {
+      await fetch(`/api/students/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      toast(`${display} removed`, 'success');
+      loadStudents(); loadStatus();
+    } catch(e) { toast('Delete failed: ' + e.message, 'error'); }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ATTENDANCE LOG
+// ═══════════════════════════════════════════════════════════════════════════
+let attendanceRecords = [];
+
+async function loadTodayAttendance() {
+  const el = document.getElementById('historyContent');
+  el.innerHTML = '<div class="loading-inline"><div class="spinner-sm"></div> Loading...</div>';
+  try {
+    const d = await (await fetch('/api/attendance/today')).json();
+    if (d.status === 'error') {
+      el.innerHTML = `<div class="warn-bar">⚠️ ${d.message} — Add credentials.json to view attendance history from Google Sheets.</div>`;
+      return;
+    }
+    attendanceRecords = d.records || [];
+    if (!attendanceRecords.length) {
+      el.innerHTML = '<div class="empty-state"><span>📋</span><p>No attendance records for today yet.</p></div>'; return;
+    }
+    const present = attendanceRecords.filter(r => r.status === 'present').length;
+    const late    = attendanceRecords.filter(r => r.status === 'late').length;
+    const absent  = attendanceRecords.filter(r => r.status === 'absent').length;
+    el.innerHTML = `
+      <div class="at-summary">
+        <div class="ats-item green"><strong>${present}</strong> Present</div>
+        <div class="ats-item amber"><strong>${late}</strong> Late</div>
+        <div class="ats-item red"><strong>${absent}</strong> Absent</div>
+        <div class="ats-item blue"><strong>${attendanceRecords.length}</strong> Total</div>
+      </div>
+      <table class="at-table">
+        <thead><tr><th>#</th><th>Student</th><th>Status</th></tr></thead>
+        <tbody>${attendanceRecords.map((r,i) => `
+          <tr>
+            <td class="row-num">${i+1}</td>
+            <td>${r.name.replace(/_/g,' ')}</td>
+            <td><span class="status-chip ${r.status}">${r.status.toUpperCase()}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    document.getElementById('d-present').textContent = present;
+    document.getElementById('d-absent').textContent  = absent;
+  } catch(e) { el.innerHTML = `<div class="error-bar">❌ ${e.message}</div>`; }
+}
+
+function exportCSV() {
+  if (!attendanceRecords.length) { toast('No data to export', 'warn'); return; }
+  const rows = [['Student Name','Status'], ...attendanceRecords.map(r => [r.name.replace(/_/g,' '), r.status])];
+  const csv  = rows.map(r => r.join(',')).join('\n');
+  const a    = document.createElement('a');
+  a.href     = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `attendance_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('CSV exported', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  REPORTS
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadReports() {
+  const el = document.getElementById('reportsContent');
+  el.innerHTML = '<div class="loading-inline"><div class="spinner-sm"></div> Generating report...</div>';
+  try {
+    const d = await (await fetch('/api/attendance/today')).json();
+    if (d.status === 'error') {
+      el.innerHTML = `<div class="warn-bar">⚠️ ${d.message} — Requires Google Sheets credentials.</div>
+        <button class="btn btn-primary" onclick="showSection('settings')">Setup Credentials</button>`; return;
+    }
+    const records = d.records || [];
+    if (!records.length) { el.innerHTML = '<div class="empty-state"><span>📈</span><p>No attendance data available.</p></div>'; return; }
+    const total   = records.length;
+    const present = records.filter(r => r.status === 'present').length;
+    const pct     = total ? Math.round((present/total)*100) : 0;
+    el.innerHTML = `
+      <div class="report-header">
+        <div class="big-stat">
+          <div class="big-num">${pct}%</div>
+          <div class="big-lbl">Overall Attendance Today</div>
+        </div>
+        <div class="donut-wrap">
+          <svg viewBox="0 0 36 36" class="donut">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#30363d" stroke-width="3.8"/>
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#3fb950" stroke-width="3.8"
+              stroke-dasharray="${pct} ${100-pct}" stroke-dashoffset="25" stroke-linecap="round"/>
+          </svg>
+          <div class="donut-pct">${pct}%</div>
+        </div>
+      </div>
+      <table class="at-table">
+        <thead><tr><th>Student</th><th>Status</th><th>Attendance %</th></tr></thead>
+        <tbody>${records.map(r => {
+          const sp = r.status === 'present' ? 100 : 0;
+          return `<tr>
+            <td>${r.name.replace(/_/g,' ')}</td>
+            <td><span class="status-chip ${r.status}">${r.status.toUpperCase()}</span></td>
+            <td><div class="mini-bar-wrap"><div class="mini-bar ${r.status==='present'?'green-bar':'red-bar'}" style="width:${sp}%"></div><span>${sp}%</span></div></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  } catch(e) { el.innerHTML = `<div class="error-bar">❌ ${e.message}</div>`; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadSettings() {
+  await loadStatus();
+  try {
+    const d = await (await fetch('/api/settings')).json();
+    document.getElementById('setTolerance').value  = d.tolerance;
+    document.getElementById('tolVal').textContent   = d.tolerance;
+    document.getElementById('setScale').value       = d.scale;
+    document.getElementById('scaleVal').textContent = d.scale;
+    document.getElementById('setMaxTime').value     = d.max_in_time?.slice(0,5) || '16:00';
+    document.getElementById('setCameraUrl').value   = d.camera_url || '';
+    document.getElementById('setWebcamIdx').value   = d.webcam_index ?? 0;
+    document.getElementById('setVoicePhrase').value = d.voice_phrase || 'take attendance';
+  } catch { /* ignore */ }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function saveSettings() {
+  const btn = document.getElementById('btnSaveSettings');
+  if (btn) btn.disabled = true;
+  try {
+    const payload = {
+      tolerance:    parseFloat(document.getElementById('setTolerance').value),
+      scale:        parseFloat(document.getElementById('setScale').value),
+      max_in_time:  document.getElementById('setMaxTime').value + ':00',
+      camera_url:   document.getElementById('setCameraUrl').value.trim(),
+      webcam_index: parseInt(document.getElementById('setWebcamIdx').value),
+      voice_phrase: document.getElementById('setVoicePhrase').value.trim(),
+    };
+    const d = await (await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })).json();
+    if (d.status === 'success') toast(d.message, 'success');
+    else toast('Save failed: ' + d.message, 'error');
+  } catch(e) { toast('Error saving settings: ' + e.message, 'error'); }
+  if (btn) btn.disabled = false;
+}
+
+
+loadStatus();
+loadDashboard();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CAMERA GRID (dashboard)
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadCameraGrid() {
+  try {
+    const d = await (await fetch('/api/cameras')).json();
+    const grid  = document.getElementById('cameraGrid');
+    const empty = document.getElementById('cameraGridEmpty');
+    if (!d.cameras || d.cameras.length === 0) {
+      grid.innerHTML = '';
+      grid.appendChild(empty);
+      return;
+    }
+    grid.innerHTML = d.cameras.map(cam => `
+      <div class="panel" style="padding:1.25rem;gap:.75rem;display:flex;flex-direction:column;" id="camcard_${cam.id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-weight:600;font-size:.95rem;">${cam.display_name || cam.sheet_name}</div>
+            <div style="font-size:.72rem;color:var(--muted);font-family:monospace;margin-top:2px;">${cam.sheet_name}</div>
+          </div>
+          <span class="badge blue" id="camstatus_${cam.id}" style="font-size:.7rem;">—</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);">${cam.rtsp_url ? '📡 ' + cam.rtsp_url : '⚠️ No URL configured'}</div>
+        <button class="btn btn-primary" style="font-size:.85rem;padding:.6rem 1rem;"
+          onclick="triggerCamera('${cam.id}')">📸 Take Attendance</button>
+      </div>
+    `).join('');
+
+    // Populate camera select in attendance tab
+    populateCameraSelect(d.cameras);
+
+    // Ping each camera status
+    d.cameras.forEach(async cam => {
+      try {
+        const s = await (await fetch(`/api/cameras/${cam.id}/status`)).json();
+        const el = document.getElementById(`camstatus_${cam.id}`);
+        if (el) {
+          el.textContent = s.ok ? '✓ Online' : '✗ Offline';
+          el.className   = 'badge ' + (s.ok ? 'green' : 'red');
+          el.style.fontSize = '.7rem';
+        }
+      } catch {}
+    });
+  } catch(e) {
+    console.warn('loadCameraGrid error:', e);
+  }
+}
+
+function populateCameraSelect(cameras) {
+  const sel = document.getElementById('atCameraSelect');
+  if (!sel) return;
+  // Keep default option, remove rest
+  while (sel.options.length > 1) sel.remove(1);
+  cameras.forEach(cam => {
+    const opt = document.createElement('option');
+    opt.value = cam.id;
+    opt.textContent = cam.display_name || cam.sheet_name;
+    sel.appendChild(opt);
+  });
+}
+
+async function takeAllAttendance() {
+  const btn = document.getElementById('btnTakeAll');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Processing…'; }
+  try {
+    const d = await (await fetch('/api/cameras')).json();
+    const cameras = d.cameras || [];
+    if (!cameras.length) { toast('No cameras registered.', 'warn'); return; }
+    let successCount = 0;
+    for (const cam of cameras) {
+      try {
+        const r = await (await fetch('/take-attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ camera_id: cam.id })
+        })).json();
+        if (r.status === 'success') {
+          successCount++;
+          toast(`✓ ${cam.display_name || cam.id}: ${r.present.length} present`, 'success', 6000);
+        }
+      } catch(e) {
+        toast(`✗ ${cam.display_name || cam.id}: ${e.message}`, 'error');
+      }
+    }
+    loadCameraGrid();
+    toast(`All attendance done: ${successCount}/${cameras.length} cameras`, 'info');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = '⚡ All Cameras'; }
+}
+
+// Load camera grid on startup
+loadCameraGrid();
+
+</script>
+</body>
+</html>

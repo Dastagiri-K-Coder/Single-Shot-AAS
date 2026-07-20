@@ -1,0 +1,30 @@
+[Unit]
+Description=AI Attendance System — Web Dashboard
+Documentation=https://github.com/Kalyan-Koppula/Single-Shot-2A
+After=network.target
+Wants=network.target
+
+[Service]
+# ── Working directory (where config.py and .env live) ──────────────────────
+WorkingDirectory=/home/giri/Projects/Single Shot 2A/Kalyan-Koppula/face recognition source code
+
+# ── Start command ──────────────────────────────────────────────────────────
+ExecStart=/home/giri/Projects/Single Shot 2A/Kalyan-Koppula/.venv/bin/python main.py --web
+
+# ── Restart policy ──────────────────────────────────────────────────────────
+Restart=always
+RestartSec=5
+
+# ── User & Environment ─────────────────────────────────────────────────────
+User=giri
+Environment=PYTHONUNBUFFERED=1
+# Needed so face_recognition can find shared libs under pyenv/venv
+Environment=HOME=/home/giri
+
+# ── Output goes to systemd journal (use: journalctl -u attendance -f) ──────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=attendance
+
+[Install]
+WantedBy=multi-user.target

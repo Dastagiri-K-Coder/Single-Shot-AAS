@@ -1,0 +1,63 @@
+# =============================================================================
+#  .dockerignore — Exclude files from Docker build context
+# =============================================================================
+
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Secrets — NEVER bake these into the image
+.env
+credentials.json
+token.json
+service_account.json
+
+# Student biometric data — must be mounted as volumes, not baked in
+known face photos/
+known face encodings/
+captured/
+
+# Vosk model — too large (50 MB); download at runtime or mount as volume
+vosk-model-*/
+
+# Dev tools
+.pre-commit-config.yaml
+.secrets.baseline
+requirements-dev.txt
+pyproject.toml
+Makefile
+setup.sh
+tests/
+htmlcov/
+.coverage
+*.log
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Dev container
+.devcontainer/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# MIT App Inventor (not needed in container)
+App/
