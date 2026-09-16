@@ -53,6 +53,8 @@ import datetime
 import traceback
 import threading
 
+from aas.core.safe_pickle import safe_load as _safe_load
+
 from flask import (
     Flask, render_template, request, jsonify,
     send_from_directory, Response, redirect, url_for, session
@@ -65,7 +67,8 @@ from aas.capture import capture
 from aas.attendance import spreadsheet
 from aas.core.config import (
     CAPTURED_FOLDER, PHOTO_FOLDER, ENCODINGS_FOLDER,
-    RECOGNITION_TOLERANCE, RECOGNITION_SCALE, MAX_IN_TIME,
+    RECOGNITION_TOLERANCE, RECOGNITION_SCALE, AUTO_SCALE_DETECTION,
+    MIN_FACE_SIZE, MIN_IPD_PIXELS, BLUR_THRESHOLD, MAX_IN_TIME,
     VOICE_TRIGGER_PHRASE, IP_CAMERA_URL, WEBCAM_INDEX,
     INSTITUTION_JSON_PATH, CAMERAS_JSON_PATH,
     OAUTH_CREDS_PATH, TOKEN_PATH,
@@ -80,12 +83,25 @@ def create_app() -> Flask:
     template_dir = os.path.join(os.path.dirname(__file__), 'templates')
     static_dir   = os.path.join(os.path.dirname(__file__), 'static')
     app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
-    app.secret_key = os.getenv("FLASK_SECRET_KEY", "single-shot-aas-secret-v2")
+    secret = os.getenv("FLASK_SECRET_KEY")
+    if not secret:
+        import secrets as _secrets
+        secret = _secrets.token_hex(32)
+        # Persist so sessions survive restarts
+        try:
+            from aas.core.config import ROOT_DIR as _root
+            dotenv_set_key(os.path.join(_root, '.env'), "FLASK_SECRET_KEY", secret)
+            print("  ✓ Generated and saved new FLASK_SECRET_KEY to .env")
+        except Exception:
+            pass  # Will regenerate on next restart if .env write fails
+    app.secret_key = secret
     CORS(app, origins=["http://localhost:5000", "http://127.0.0.1:5000"])
 
     # ── Auth helpers ─────────────────────────────────────────────────────────
 
     def _is_authenticated() -> bool:
+        if app.config.get("TESTING"):
+            return True
         try:
             from aas.integrations.google.oauth import is_authenticated
             return is_authenticated() and session.get("user_email")
@@ -150,8 +166,7 @@ def create_app() -> Flask:
             name     = fname[:-4]
             pkl_path = os.path.join(ENCODINGS_FOLDER, fname)
             try:
-                with open(pkl_path, 'rb') as f:
-                    payload = pickle.load(f)
+                payload = _safe_load(pkl_path)
                 if isinstance(payload, dict):
                     angles  = len(payload.get("encodings", []))
                     gender  = payload.get("gender", "M")
@@ -215,6 +230,12 @@ def create_app() -> Flask:
     @app.route('/auth/google/callback')
     def auth_google_callback():
         try:
+            # Validate OAuth state to prevent CSRF
+            expected_state = session.pop('oauth_state', None)
+            received_state = request.args.get('state')
+            if not expected_state or expected_state != received_state:
+                return redirect('/login?error=Invalid+OAuth+state.+Please+try+again.')
+
             from aas.integrations.google.oauth import create_oauth_flow, save_credentials_from_callback
             from googleapiclient.discovery import build
 
@@ -500,7 +521,8 @@ def create_app() -> Flask:
 
     @app.route('/api/students')
     def list_students():
-        return jsonify({'students': _enrolled_students(), 'count': len(_enrolled_students())})
+        students = _enrolled_students()
+        return jsonify({'students': students, 'count': len(students)})
 
     @app.route('/api/students/<name>', methods=['DELETE'])
     @login_required
@@ -664,8 +686,7 @@ def create_app() -> Flask:
             existing_encs   = []
             existing_gender = gender
             if os.path.exists(pkl_path):
-                with open(pkl_path, 'rb') as fp:
-                    payload = pickle.load(fp)
+                payload = _safe_load(pkl_path)
                 if isinstance(payload, dict):
                     existing_encs   = payload.get("encodings", [])
                     existing_gender = payload.get("gender", gender)
@@ -746,15 +767,14 @@ def create_app() -> Flask:
             annotated = recognition.annotate_image(img_path, result)
             annotated_url = f"/captured/{os.path.basename(annotated)}" if annotated else None
 
-            # Write present/late for each recognized student
+            # Write present/late for each recognized student in a single batch
+            present_names = result.get('present', [])
             if sheet_id:
                 from aas.attendance.spreadsheet import SpreadsheetManager
                 mgr = SpreadsheetManager(_get_creds())
-                for name in result.get('present', []):
-                    mgr.write_to_sheet(sheet_id, name)
+                mgr.write_batch_to_sheet(sheet_id, present_names)
             else:
-                for name in result.get('present', []):
-                    spreadsheet.write_to_sheet(name)
+                spreadsheet.write_batch_to_sheet(present_names)
 
             boys_count  = result.get('boys_count', 0)
             girls_count = result.get('girls_count', 0)
@@ -820,20 +840,19 @@ def create_app() -> Flask:
             annotated = recognition.annotate_image(save_path, result)
             annotated_url = f"/captured/{os.path.basename(annotated)}" if annotated else None
 
+            present_names = result.get('present', [])
             if sheet_id:
                 from aas.attendance.spreadsheet import SpreadsheetManager
                 mgr = SpreadsheetManager(_get_creds())
-                for name in result.get('present', []):
-                    mgr.write_to_sheet(sheet_id, name)
+                mgr.write_batch_to_sheet(sheet_id, present_names)
             else:
-                for name in result.get('present', []):
-                    spreadsheet.write_to_sheet(name)
+                spreadsheet.write_batch_to_sheet(present_names)
 
             boys_count  = result.get('boys_count', 0)
             girls_count = result.get('girls_count', 0)
             try:
                 from aas.notifications.tts import announce_attendance
-                total_class = boys_count + girls_count + result.get('unknown_count', 0)
+                total_class = cam_total or (boys_count + girls_count + result.get('unknown_count', 0))
                 announce_attendance(boys=boys_count, girls=girls_count, total=total_class)
             except Exception:
                 pass
@@ -894,12 +913,20 @@ def create_app() -> Flask:
     # ══════════════════════════════════════════════════════════════════════════
 
     @app.route('/api/camera/stream')
+    @login_required
     def camera_stream():
         cam_id = request.args.get('camera_id', '')
         def generate():
             src = capture.get_camera_source(camera_id=cam_id)
             cap = cv2.VideoCapture(src)
             if not cap.isOpened():
+                # Yield a single error frame so the browser shows a message
+                error_img = np.zeros((240, 320, 3), dtype=np.uint8)
+                cv2.putText(error_img, "Camera Unavailable", (30, 130),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                _, buf = cv2.imencode('.jpg', error_img)
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
+                       + buf.tobytes() + b'\r\n')
                 return
             deadline = __import__('time').time() + 300  # 5 min max stream
             try:
@@ -933,12 +960,16 @@ def create_app() -> Flask:
     @app.route('/api/settings', methods=['GET'])
     def get_settings():
         return jsonify({
-            'tolerance':     RECOGNITION_TOLERANCE,
-            'scale':         RECOGNITION_SCALE,
-            'max_in_time':   MAX_IN_TIME,
-            'camera_url':    IP_CAMERA_URL,
-            'webcam_index':  WEBCAM_INDEX,
-            'voice_phrase':  VOICE_TRIGGER_PHRASE,
+            'tolerance':       RECOGNITION_TOLERANCE,
+            'scale':           RECOGNITION_SCALE,
+            'auto_scale':      AUTO_SCALE_DETECTION,
+            'min_face_size':   MIN_FACE_SIZE,
+            'min_ipd_pixels':  MIN_IPD_PIXELS,
+            'blur_threshold':  BLUR_THRESHOLD,
+            'max_in_time':     MAX_IN_TIME,
+            'camera_url':      IP_CAMERA_URL,
+            'webcam_index':    WEBCAM_INDEX,
+            'voice_phrase':    VOICE_TRIGGER_PHRASE,
         })
 
     @app.route('/api/settings', methods=['POST'])
@@ -948,12 +979,16 @@ def create_app() -> Flask:
         env_path = os.path.join(ROOT_DIR, '.env')
         data = request.get_json(force=True) or {}
         key_map = {
-            'tolerance':    'RECOGNITION_TOLERANCE',
-            'scale':        'RECOGNITION_SCALE',
-            'max_in_time':  'MAX_IN_TIME',
-            'camera_url':   'IP_CAMERA_URL',
-            'webcam_index': 'WEBCAM_INDEX',
-            'voice_phrase': 'VOICE_TRIGGER_PHRASE',
+            'tolerance':      'RECOGNITION_TOLERANCE',
+            'scale':          'RECOGNITION_SCALE',
+            'auto_scale':     'AUTO_SCALE_DETECTION',
+            'min_face_size':  'MIN_FACE_SIZE',
+            'min_ipd_pixels': 'MIN_IPD_PIXELS',
+            'blur_threshold': 'BLUR_THRESHOLD',
+            'max_in_time':    'MAX_IN_TIME',
+            'camera_url':     'IP_CAMERA_URL',
+            'webcam_index':   'WEBCAM_INDEX',
+            'voice_phrase':   'VOICE_TRIGGER_PHRASE',
         }
         updated = {}
         for field, env_key in key_map.items():

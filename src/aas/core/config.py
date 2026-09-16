@@ -78,12 +78,20 @@ CAMERA_WARMUP_FRAMES = 5                            # frames to discard before c
 # Default 0.55 is slightly stricter than dlib's default 0.6
 RECOGNITION_TOLERANCE = float(os.getenv("RECOGNITION_TOLERANCE", "0.55"))
 
-# Fraction to resize image before recognition (0.25 = quarter size = 4x faster)
-# Increase to 0.5 for better accuracy on very small/distant faces
-RECOGNITION_SCALE     = float(os.getenv("RECOGNITION_SCALE", "0.25"))
+# Base scale factor (IGNORED when AUTO_SCALE_DETECTION=true — adaptive scale is used instead).
+# Only takes effect when AUTO_SCALE_DETECTION=false.
+RECOGNITION_SCALE     = float(os.getenv("RECOGNITION_SCALE", "0.5"))
+AUTO_SCALE_DETECTION  = os.getenv("AUTO_SCALE_DETECTION", "true").lower() in ("true", "1", "yes")
 
-# Face detection model: "hog" (fast, CPU-only) or "cnn" (accurate, needs GPU/dlib-cuda)
-# Raspberry Pi 4 -> always use "hog"
+# International standard standards (IEC 62676-4 & ISO/IEC 19794-5)
+MIN_FACE_SIZE         = int(os.getenv("MIN_FACE_SIZE", "80"))        # 80x80 px minimum
+MIN_IPD_PIXELS        = int(os.getenv("MIN_IPD_PIXELS", "30"))      # 30 px eye-to-eye minimum
+BLUR_THRESHOLD        = float(os.getenv("BLUR_THRESHOLD", "40.0"))  # Laplacian variance minimum
+MIN_IMAGE_WIDTH       = int(os.getenv("MIN_IMAGE_WIDTH", "1280"))   # Minimum width allowed
+RECOMMENDED_IMAGE_WIDTH = int(os.getenv("RECOMMENDED_IMAGE_WIDTH", "1920")) # 1080p classroom standard
+
+# Face detection model: "hog" (fast, CPU-only), "cnn" (accurate, needs GPU/dlib-cuda), or "auto"
+# Raspberry Pi 4 -> "hog" or "yunet"
 # Laptop / desktop with GPU -> can use "cnn" for better accuracy
 FACE_DETECTION_MODEL  = os.getenv("FACE_DETECTION_MODEL", "hog").lower()
 

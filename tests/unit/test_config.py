@@ -21,7 +21,15 @@ class TestConfig:
     def test_recognition_scale_default(self, monkeypatch):
         monkeypatch.delenv("RECOGNITION_SCALE", raising=False)
         importlib.reload(cfg)
-        assert cfg.RECOGNITION_SCALE == 0.25
+        assert cfg.RECOGNITION_SCALE == 0.5
+
+    def test_standards_constants_defaults(self, monkeypatch):
+        monkeypatch.delenv("MIN_FACE_SIZE", raising=False)
+        monkeypatch.delenv("MIN_IPD_PIXELS", raising=False)
+        importlib.reload(cfg)
+        assert cfg.MIN_FACE_SIZE == 80
+        assert cfg.MIN_IPD_PIXELS == 30
+        assert cfg.AUTO_SCALE_DETECTION is True
 
     def test_webcam_index_is_int(self, monkeypatch):
         monkeypatch.setenv("WEBCAM_INDEX", "2")

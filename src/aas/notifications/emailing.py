@@ -15,8 +15,9 @@ import ssl
 import datetime
 import os
 from dotenv import load_dotenv
+from aas.core.config import ROOT_DIR
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(ROOT_DIR, '.env'))
 
 # ── Credentials from environment (NEVER hardcode) ─────────────────────────────
 SENDER   = os.getenv("GMAIL_SENDER")

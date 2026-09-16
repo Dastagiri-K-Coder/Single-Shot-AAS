@@ -136,37 +136,41 @@ def capture_with_preview(save_path: str = None) -> str | None:
     save_path = save_path or _make_save_path()
     mode_str  = "Webcam" if isinstance(source, int) else "IP Camera"
 
-    cap = cv2.VideoCapture(source)
-    if not cap.isOpened():
-        raise RuntimeError(f"Cannot open camera: {source}")
+    _camera_lock.acquire()
+    try:
+        cap = cv2.VideoCapture(source)
+        if not cap.isOpened():
+            raise RuntimeError(f"Cannot open camera: {source}")
 
-    print(f"\nLive preview ({mode_str}) — Press SPACE to capture | Q to quit")
+        print(f"\nLive preview ({mode_str}) — Press SPACE to capture | Q to quit")
 
-    captured_path = None
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("  [ERROR] Lost camera feed.")
-            break
+        captured_path = None
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                print("  [ERROR] Lost camera feed.")
+                break
 
-        display = frame.copy()
-        cv2.putText(display, f"{mode_str} — Press SPACE to capture",
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 100), 2)
-        cv2.putText(display, "Q = Cancel",
-                    (10, display.shape[0] - 15),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (100, 100, 255), 1)
-        cv2.imshow("Classroom Capture", display)
+            display = frame.copy()
+            cv2.putText(display, f"{mode_str} — Press SPACE to capture",
+                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 100), 2)
+            cv2.putText(display, "Q = Cancel",
+                        (10, display.shape[0] - 15),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (100, 100, 255), 1)
+            cv2.imshow("Classroom Capture", display)
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord(' '):
-            cv2.imwrite(save_path, frame)
-            print(f"  ✓ Captured: {save_path}")
-            captured_path = save_path
-            break
-        elif key == ord('q'):
-            print("  Capture cancelled.")
-            break
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord(' '):
+                cv2.imwrite(save_path, frame)
+                print(f"  ✓ Captured: {save_path}")
+                captured_path = save_path
+                break
+            elif key == ord('q'):
+                print("  Capture cancelled.")
+                break
 
-    cap.release()
-    cv2.destroyAllWindows()
-    return captured_path
+        cap.release()
+        cv2.destroyAllWindows()
+        return captured_path
+    finally:
+        _camera_lock.release()

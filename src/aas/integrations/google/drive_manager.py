@@ -67,13 +67,18 @@ def _build_sheets(creds: Credentials):
 
 # ── Folder Operations ─────────────────────────────────────────────────────────
 
+def _escape_drive_name(name: str) -> str:
+    """Escape single quotes for Drive API query strings."""
+    return name.replace("\\", "\\\\").replace("'", "\\'")
+
 def _find_folder(service, name: str, parent_id: str = None) -> str | None:
     """
     Search Drive for a folder with the given name.
     Returns folder ID if found, else None.
     """
+    safe_name = _escape_drive_name(name)
     query = (
-        f"name = '{name}' "
+        f"name = '{safe_name}' "
         f"and mimeType = 'application/vnd.google-apps.folder' "
         f"and trashed = false"
     )
@@ -142,8 +147,9 @@ def ensure_section_folder(creds: Credentials, root_folder_id: str, section_name:
 
 def _find_spreadsheet(drive_service, name: str, parent_id: str) -> str | None:
     """Search for a spreadsheet by name inside a folder. Returns sheet ID or None."""
+    safe_name = _escape_drive_name(name)
     query = (
-        f"name = '{name}' "
+        f"name = '{safe_name}' "
         f"and mimeType = 'application/vnd.google-apps.spreadsheet' "
         f"and '{parent_id}' in parents "
         f"and trashed = false"
@@ -230,8 +236,9 @@ def upload_file_to_folder(
     drive_filename = drive_filename or os.path.basename(local_path)
 
     # Check if a file with same name already exists → update it
+    safe_name = _escape_drive_name(drive_filename)
     query = (
-        f"name = '{drive_filename}' "
+        f"name = '{safe_name}' "
         f"and '{folder_id}' in parents "
         f"and trashed = false"
     )

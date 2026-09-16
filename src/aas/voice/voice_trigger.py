@@ -67,6 +67,13 @@ _SAMPLE_RATE = 16000    # Hz — required by Vosk small-en-us model
 _BLOCK_SIZE  = 8000     # samples per audio block
 
 
+import time as _time_module
+
+_processing_lock = threading.Lock()
+_COOLDOWN_SECONDS = 30
+_last_trigger_time = 0.0
+
+
 def listen_for_trigger(on_trigger_callback: callable,
                        run_once: bool = False) -> None:
     """
@@ -133,10 +140,28 @@ def listen_for_trigger(on_trigger_callback: callable,
                     print(f"  Heard: \"{text}\"")
 
                 if VOICE_TRIGGER_PHRASE in text:
+                    if not _processing_lock.acquire(blocking=False):
+                        print("  [SKIP] Already processing attendance. Ignoring duplicate trigger.")
+                        continue
+                    elapsed = _time_module.time() - _last_trigger_time
+                    if elapsed < _COOLDOWN_SECONDS:
+                        _processing_lock.release()
+                        print(f"  [SKIP] Cooldown active ({_COOLDOWN_SECONDS - elapsed:.0f}s remaining).")
+                        continue
+
                     print(f"\n  ✅ Trigger detected! Launching attendance capture ...\n")
                     triggered = True
+
+                    def _guarded_callback():
+                        global _last_trigger_time
+                        try:
+                            on_trigger_callback()
+                        finally:
+                            _last_trigger_time = _time_module.time()
+                            _processing_lock.release()
+
                     # Run in background thread so audio loop isn't blocked
-                    t = threading.Thread(target=on_trigger_callback, daemon=True)
+                    t = threading.Thread(target=_guarded_callback, daemon=True)
                     t.start()
 
             else:

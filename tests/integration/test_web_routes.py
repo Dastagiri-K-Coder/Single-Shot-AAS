@@ -22,6 +22,14 @@ def flask_client(tmp_dirs, monkeypatch):
     monkeypatch.setattr("aas.core.config.PHOTO_FOLDER",     str(tmp_dirs["photos"]))
     monkeypatch.setattr("aas.core.config.CAPTURED_FOLDER",  str(tmp_dirs["captured"]))
 
+    import aas.web.app as web_app
+    monkeypatch.setattr(web_app, "ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
+    monkeypatch.setattr(web_app, "PHOTO_FOLDER",     str(tmp_dirs["photos"]))
+    monkeypatch.setattr(web_app, "CAPTURED_FOLDER",  str(tmp_dirs["captured"]))
+
+    import aas.recognition.engine as eng
+    monkeypatch.setattr(eng, "ENCODINGS_FOLDER", str(tmp_dirs["encodings"]))
+
     from aas.web.app import create_app
     app = create_app()
     app.config["TESTING"] = True
@@ -145,9 +153,10 @@ class TestSettingsRoute:
     def test_save_settings_updates_valid_field(self, flask_client, tmp_dirs, monkeypatch):
         env_path = tmp_dirs["captured"].parent / ".env"
         env_path.write_text("RECOGNITION_TOLERANCE=0.55\n")
+        orig_join = os.path.join
         monkeypatch.setattr(
             "aas.web.app.os.path.join",
-            lambda *a: str(env_path) if ".env" in str(a) else os.path.join(*a),
+            lambda *a: str(env_path) if ".env" in str(a) else orig_join(*a),
         )
 
         resp = flask_client.post(

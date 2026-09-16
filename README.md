@@ -32,59 +32,68 @@
 ## 🗂️ Repository Map
 
 ```
-Single Shot AAS/                        ← Repository Root
+├── docs/                               ← Architecture & research documentation
+│   ├── Single_Shot_2AS_Technical_Paper.md ← Comprehensive architectural whitepaper
+│   └── Pixels Required for AI Facial Recognition (1).md ← IEC/ISO standards specifications
 │
 ├── src/                                ← Python package root (PYTHONPATH=src)
 │   └── aas/                            ← Top-level package
 │       ├── core/
-│       │   └── config.py               ← All env vars, paths, constants
+│       │   ├── config.py               ← All env vars, paths, constants
+│       │   ├── retry.py                ← Exponential backoff retry for transient API errors
+│       │   └── safe_pickle.py          ← Restricted unpickler blocking arbitrary code execution
 │       │
 │       ├── recognition/
-│       │   └── engine.py               ← Face detection + encoding + annotation
+│       │   ├── __init__.py             ← Public exports (engine, detectors, metrics)
+│       │   ├── engine.py               ← Recognition pipeline + quality gating + 3-state annotations
+│       │   ├── detectors.py            ← Multi-scale detector (OpenCV YuNet + dlib fallback)
+│       │   └── metrics.py              ← Sharpness, IPD, and adaptive scale calculators
 │       │
 │       ├── enrollment/
-│       │   └── enroll.py               ← CLI 3-angle enrollment flow
+│       │   └── enroll.py               ← CLI 3-angle enrollment flow & quality validator
 │       │
 │       ├── capture/
-│       │   ├── capture.py              ← RTSP / webcam image capture
-│       │   └── camera_registry.py      ← cameras.json CRUD (per-section cameras)
+│       │   ├── capture.py              ← RTSP / webcam image capture (thread-locked)
+│       │   └── camera_registry.py      ← cameras.json CRUD (thread-safe per-section cameras)
 │       │
 │       ├── attendance/
-│       │   └── spreadsheet.py          ← Google Sheets read/write (mark present/absent)
+│       │   └── spreadsheet.py          ← Google Sheets atomic batch read/write
 │       │
 │       ├── integrations/
 │       │   └── google/
-│       │       ├── oauth.py            ← Google OAuth2 token flow
-│       │       └── drive_manager.py    ← Drive folder + Sheets creation
+│       │       ├── oauth.py            ← Google OAuth2 token flow & CSRF state validation
+│       │       └── drive_manager.py    ← Sanitized Drive folder + Sheets creation
 │       │
 │       ├── notifications/
 │       │   ├── emailing.py             ← Gmail SMTP attendance emails
 │       │   └── tts.py                  ← pyttsx3 / espeak TTS announcement
 │       │
 │       ├── voice/
-│       │   └── voice_trigger.py        ← Vosk offline speech recognition trigger
+│       │   └── voice_trigger.py        ← Vosk offline trigger with cooldown guard
 │       │
 │       └── web/                        ← Flask web application
-│           ├── app.py                  ← 975-line Flask app (15+ routes)
+│           ├── app.py                  ← Flask app (batch attendance, secure tokens, stream auth)
 │           ├── static/
-│           │   └── style.css           ← Dashboard styles (41 KB)
+│           │   └── style.css           ← Dashboard styles
 │           └── templates/
 │               ├── splash.html
 │               ├── login.html
-│               ├── index.html          ← Main SPA dashboard (62 KB)
+│               ├── index.html          ← Main SPA dashboard
 │               └── setup/
-│                   ├── step1.html      ← Institution details
-│                   ├── step2.html      ← Section / sheet creation
-│                   ├── step3.html      ← Camera assignment
+│                   ├── step1.html
+│                   ├── step2.html
+│                   ├── step3.html
 │                   └── complete.html
 │
 ├── tests/
 │   ├── conftest.py                     ← Shared pytest fixtures
-│   ├── unit/                           ← 50 unit tests
+│   ├── unit/                           ← 100+ unit tests
 │   │   ├── test_config.py
 │   │   ├── test_recognition.py
 │   │   ├── test_recognition_gender.py
-│   │   ├── test_spreadsheet.py
+│   │   ├── test_recognition_standards.py ← IEC/ISO standards tests
+│   │   ├── test_safe_pickle.py         ← Pickle exploit defense tests
+│   │   ├── test_spreadsheet.py         ← Atomic batch update tests
 │   │   ├── test_camera_registry.py
 │   │   ├── test_drive_manager.py
 │   │   ├── test_oauth.py

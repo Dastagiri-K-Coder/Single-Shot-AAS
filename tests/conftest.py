@@ -85,9 +85,9 @@ def mock_gspread(monkeypatch):
 def mock_smtp(monkeypatch):
     """Prevent any real email being sent during tests."""
     mock_server = MagicMock()
+    mock_server.__enter__.return_value = mock_server
+    mock_server.__exit__.return_value = False
     monkeypatch.setattr("smtplib.SMTP_SSL", lambda *a, **kw: mock_server)
-    mock_server.__enter__ = lambda s: s
-    mock_server.__exit__ = MagicMock(return_value=False)
     return mock_server
 
 

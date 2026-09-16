@@ -18,7 +18,10 @@ Functions:
 import os
 import json
 import uuid
+import threading
 from aas.core.config import CAMERAS_JSON_PATH
+
+_registry_lock = threading.RLock()
 
 
 # ── Default template for a new camera entry ───────────────────────────────────
@@ -54,15 +57,16 @@ def _default_camera(
 
 def load_cameras() -> list[dict]:
     """Load all cameras from cameras.json. Returns empty list if file missing."""
-    if not os.path.exists(CAMERAS_JSON_PATH):
-        return []
-    try:
-        with open(CAMERAS_JSON_PATH, "r") as f:
-            data = json.load(f)
-        return data.get("cameras", [])
-    except Exception as e:
-        print(f"  [CameraRegistry] Error loading cameras.json: {e}")
-        return []
+    with _registry_lock:
+        if not os.path.exists(CAMERAS_JSON_PATH):
+            return []
+        try:
+            with open(CAMERAS_JSON_PATH, "r") as f:
+                data = json.load(f)
+            return data.get("cameras", [])
+        except Exception as e:
+            print(f"  [CameraRegistry] Error loading cameras.json: {e}")
+            return []
 
 
 def get_camera(cam_id: str) -> dict | None:
@@ -81,9 +85,10 @@ def get_cameras_json_path() -> str:
 
 def save_cameras(cameras: list[dict]) -> None:
     """Persist the full cameras list to cameras.json."""
-    os.makedirs(os.path.dirname(CAMERAS_JSON_PATH), exist_ok=True)
-    with open(CAMERAS_JSON_PATH, "w") as f:
-        json.dump({"cameras": cameras}, f, indent=2)
+    with _registry_lock:
+        os.makedirs(os.path.dirname(CAMERAS_JSON_PATH), exist_ok=True)
+        with open(CAMERAS_JSON_PATH, "w") as f:
+            json.dump({"cameras": cameras}, f, indent=2)
 
 
 def add_camera(
@@ -100,29 +105,30 @@ def add_camera(
     """
     from aas.integrations.google.drive_manager import format_sheet_name
 
-    cameras = load_cameras()
-    serial = len(cameras) + 1
-    sheet_name = format_sheet_name(serial, section_code, year_start, year_end, section)
-    cam = _default_camera(
-        display_name=display_name,
-        rtsp_url=rtsp_url,
-        sheet_name=sheet_name,
-        section_code=section_code,
-        year_start=year_start,
-        year_end=year_end,
-        section=section,
-    )
-    cam["serial"] = serial
+    with _registry_lock:
+        cameras = load_cameras()
+        serial = len(cameras) + 1
+        sheet_name = format_sheet_name(serial, section_code, year_start, year_end, section)
+        cam = _default_camera(
+            display_name=display_name,
+            rtsp_url=rtsp_url,
+            sheet_name=sheet_name,
+            section_code=section_code,
+            year_start=year_start,
+            year_end=year_end,
+            section=section,
+        )
+        cam["serial"] = serial
 
-    # Create per-camera encodings subfolder
-    from aas.core.config import ENCODINGS_FOLDER
-    enc_path = os.path.join(ENCODINGS_FOLDER, cam["encodings_subfolder"])
-    os.makedirs(enc_path, exist_ok=True)
+        # Create per-camera encodings subfolder
+        from aas.core.config import ENCODINGS_FOLDER
+        enc_path = os.path.join(ENCODINGS_FOLDER, cam["encodings_subfolder"])
+        os.makedirs(enc_path, exist_ok=True)
 
-    cameras.append(cam)
-    save_cameras(cameras)
-    print(f"  ✓ Registered camera '{display_name}' → sheet: '{sheet_name}'")
-    return cam
+        cameras.append(cam)
+        save_cameras(cameras)
+        print(f"  ✓ Registered camera '{display_name}' → sheet: '{sheet_name}'")
+        return cam
 
 
 def update_camera(cam_id: str, **fields) -> dict | None:
@@ -131,24 +137,26 @@ def update_camera(cam_id: str, **fields) -> dict | None:
     Example: update_camera("cam_abc123", sheet_id="1BxiMVs...", drive_folder_id="xyz")
     Returns updated camera dict, or None if not found.
     """
-    cameras = load_cameras()
-    for cam in cameras:
-        if cam["id"] == cam_id:
-            cam.update(fields)
-            save_cameras(cameras)
-            return cam
-    print(f"  [CameraRegistry] Camera '{cam_id}' not found.")
-    return None
+    with _registry_lock:
+        cameras = load_cameras()
+        for cam in cameras:
+            if cam["id"] == cam_id:
+                cam.update(fields)
+                save_cameras(cameras)
+                return cam
+        print(f"  [CameraRegistry] Camera '{cam_id}' not found.")
+        return None
 
 
 def delete_camera(cam_id: str) -> bool:
     """Remove a camera from the registry. Returns True if removed."""
-    cameras = load_cameras()
-    updated = [c for c in cameras if c["id"] != cam_id]
-    if len(updated) == len(cameras):
-        return False
-    save_cameras(updated)
-    return True
+    with _registry_lock:
+        cameras = load_cameras()
+        updated = [c for c in cameras if c["id"] != cam_id]
+        if len(updated) == len(cameras):
+            return False
+        save_cameras(updated)
+        return True
 
 
 def get_encodings_path(cam_id: str) -> str | None:

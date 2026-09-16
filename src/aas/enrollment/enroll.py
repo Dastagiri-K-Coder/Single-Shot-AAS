@@ -26,8 +26,15 @@ import pickle
 import cv2
 import face_recognition
 
-from aas.core.config import PHOTO_FOLDER, ENCODINGS_FOLDER, WEBCAM_INDEX
+from aas.core.config import (
+    PHOTO_FOLDER,
+    ENCODINGS_FOLDER,
+    WEBCAM_INDEX,
+    MIN_FACE_SIZE,
+    BLUR_THRESHOLD,
+)
 from aas.attendance import spreadsheet
+from aas.recognition.metrics import compute_sharpness
 
 # Angles for the 3-shot enrollment workflow
 _ANGLES = [
@@ -83,6 +90,16 @@ def encoding_of_enrolled_person(name: str, image_path: str, gender: str = "M") -
         print(f"  [WARN] No face detected in: {image_path}")
         return False
 
+    top, right, bottom, left = locations[0]
+    face_w = right - left
+    face_h = bottom - top
+    if face_w < MIN_FACE_SIZE or face_h < MIN_FACE_SIZE:
+        print(f"  [WARN] Reference face in '{image_path}' is small ({face_w}×{face_h}px < {MIN_FACE_SIZE}px minimum). Accuracy may suffer.")
+
+    sharpness = compute_sharpness(img)
+    if sharpness < BLUR_THRESHOLD:
+        print(f"  [WARN] Reference photo '{image_path}' is blurry (sharpness={sharpness:.1f} < {BLUR_THRESHOLD}).")
+
     new_enc = face_recognition.face_encodings(img, locations)[0]
 
     # Load existing encodings (if any) and append
@@ -91,7 +108,8 @@ def encoding_of_enrolled_person(name: str, image_path: str, gender: str = "M") -
     existing_gender = gender
     if os.path.exists(pkl_path):
         with open(pkl_path, 'rb') as fp:
-            payload = pickle.load(fp)
+            from aas.core.safe_pickle import safe_load as _safe_load
+            payload = _safe_load(pkl_path)
         # Support both new dict format and legacy bare-list format
         if isinstance(payload, dict):
             existing_encodings = payload.get("encodings", [])
@@ -161,9 +179,21 @@ def enroll_student_3angles(name: str, gender: str = "M") -> None:
                     print(f"  [!] No face detected for {angle_tag}. Press R to retry.")
                     continue
 
+                top, right, bottom, left = locations[0]
+                face_w = right - left
+                face_h = bottom - top
+                if face_w < MIN_FACE_SIZE or face_h < MIN_FACE_SIZE:
+                    print(f"  [!] Face is too small ({face_w}×{face_h}px < {MIN_FACE_SIZE}px minimum). Move closer to camera and press R.")
+                    continue
+
+                sharpness = compute_sharpness(frame)
+                if sharpness < BLUR_THRESHOLD:
+                    print(f"  [!] Capture is blurry (sharpness={sharpness:.1f} < {BLUR_THRESHOLD}). Hold steady and press R to retry.")
+                    continue
+
                 enc = face_recognition.face_encodings(rgb, locations)[0]
                 collected_encodings.append(enc)
-                print(f"  ✓ {angle_tag} captured & encoded.")
+                print(f"  ✓ {angle_tag} captured & encoded ({face_w}px, sharpness={sharpness:.1f}).")
                 captured = True
 
             elif key == ord('r'):   # R → retry current angle
@@ -192,21 +222,20 @@ def enroll_student_3angles(name: str, gender: str = "M") -> None:
     print(f"  ✓ {name} fully enrolled!\n")
 
 
-def batch_enroll_from_folder(folder_path: str = None) -> None:
+def batch_enroll_from_folder(folder_path: str = None, default_gender: str = "M") -> None:
     """
     Enroll multiple students from a folder of photos.
-    Each image filename (without extension) becomes the student's name.
+    Supports gender via filename convention: 'john_doe__F.jpg' → gender='F'
+    Double underscore separates name from gender suffix (M, F, O).
 
     Example:
         known face photos/
-            john_doe.jpg        → enrolled as 'john_doe'
-            jane_smith.png      → enrolled as 'jane_smith'
-
-    This is a fallback for situations where webcam enrollment isn't practical.
-    For production, use enroll_student_3angles() for better accuracy.
+            john_doe__M.jpg     → enrolled as 'john_doe', gender='M'
+            jane_smith__F.png   → enrolled as 'jane_smith', gender='F'
 
     Args:
         folder_path: Folder containing student photos. Defaults to PHOTO_FOLDER.
+        default_gender: Fallback gender if not specified in filename ('M', 'F', 'O').
     """
     folder_path = folder_path or PHOTO_FOLDER
     if not os.path.isdir(folder_path):
@@ -221,9 +250,15 @@ def batch_enroll_from_folder(folder_path: str = None) -> None:
 
     print(f"Batch enrolling {len(images)} image(s) from: {folder_path}\n")
     for filename in sorted(images):
-        name = os.path.splitext(filename)[0]           # strip extension
+        base = os.path.splitext(filename)[0]
+        if '__' in base:
+            name, gender_part = base.rsplit('__', 1)
+            gender = gender_part.upper() if gender_part.upper() in ('M', 'F', 'O') else default_gender
+        else:
+            name = base
+            gender = default_gender
         img_path = os.path.join(folder_path, filename)
-        print(f"  Processing: {filename} → name='{name}'")
-        encoding_of_enrolled_person(name, img_path)
+        print(f"  Processing: {filename} → name='{name}', gender='{gender}'")
+        encoding_of_enrolled_person(name, img_path, gender=gender)
 
     print(f"\n✓ Batch enrolment complete.")

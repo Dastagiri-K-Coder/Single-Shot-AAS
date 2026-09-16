@@ -76,6 +76,9 @@ def run_once(image_path: str = None, with_preview: bool = False) -> dict:
     print("\nRunning face recognition ...")
     result = recognition.run_recognition(path)
 
+    # Write attendance for each recognized student
+    spreadsheet.write_batch_to_sheet(result.get('present', []))
+
     # Also save an annotated copy for faculty review
     if result.get("total_faces", 0) > 0:
         recognition.annotate_image(path, result)
@@ -95,6 +98,16 @@ def run_once(image_path: str = None, with_preview: bool = False) -> dict:
 
 def start_voice_mode() -> None:
     """Start the offline voice trigger. Blocks indefinitely until Ctrl+C."""
+    import signal
+    import sys
+
+    def _shutdown(signum, frame):
+        print("\n  Shutting down voice listener ...")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _shutdown)
+    signal.signal(signal.SIGTERM, _shutdown)
+
     from aas.voice.voice_trigger import listen_for_trigger
 
     print("Initialising voice trigger mode ...")
@@ -105,6 +118,7 @@ def start_voice_mode() -> None:
         try:
             path   = capture.capture_single_shot()
             result = recognition.run_recognition(path)
+            spreadsheet.write_batch_to_sheet(result.get('present', []))
             recognition.annotate_image(path, result)
             print(f"[Voice] Done. Present: {result.get('present', [])}")
         except Exception as e:
