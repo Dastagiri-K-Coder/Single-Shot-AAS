@@ -1,3 +1,304 @@
 {
-  "cameras": []
+  "cameras": [
+    {
+      "id": "cam_cse_a",
+      "display_name": "CSE-A Hall 101",
+      "rtsp_url": "demo://cam_cse_a",
+      "sheet_name": "CSE-A",
+      "section_code": "CSE",
+      "year_start": 2025,
+      "year_end": 2026,
+      "section": "A",
+      "sheet_id": "DEMO_SHEET_CSE_A",
+      "folder_id": "DEMO_FOLDER_CSE_A",
+      "timetable": {
+        "Mon": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Tue": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Wed": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Thu": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Fri": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Sat": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ]
+      },
+      "status": "active",
+      "enrolled_students": [
+        {
+          "name": "Aarav_Patel",
+          "roll_number": "CSE2025001",
+          "gender": "M"
+        },
+        {
+          "name": "Ananya_Sharma",
+          "roll_number": "CSE2025002",
+          "gender": "F"
+        },
+        {
+          "name": "Rohan_Iyer",
+          "roll_number": "CSE2025003",
+          "gender": "M"
+        },
+        {
+          "name": "Sneha_Reddy",
+          "roll_number": "CSE2025004",
+          "gender": "F"
+        },
+        {
+          "name": "Vikram_Malhotra",
+          "roll_number": "CSE2025005",
+          "gender": "M"
+        },
+        {
+          "name": "Priya_Nair",
+          "roll_number": "CSE2025006",
+          "gender": "F"
+        },
+        {
+          "name": "Karthik_Verma",
+          "roll_number": "CSE2025007",
+          "gender": "M"
+        },
+        {
+          "name": "Divya_Menon",
+          "roll_number": "CSE2025008",
+          "gender": "F"
+        },
+        {
+          "name": "Arjun_Singh",
+          "roll_number": "CSE2025009",
+          "gender": "M"
+        },
+        {
+          "name": "Meera_Krishnan",
+          "roll_number": "CSE2025010",
+          "gender": "F"
+        }
+      ],
+      "assigned_faculty_email": "faculty@democollege.edu",
+      "assigned_faculty_id": 2
+    },
+    {
+      "id": "cam_cse_b",
+      "display_name": "CSE-B Hall 102",
+      "rtsp_url": "demo://cam_cse_b",
+      "sheet_name": "CSE-B",
+      "section_code": "CSE",
+      "year_start": 2025,
+      "year_end": 2026,
+      "section": "B",
+      "sheet_id": "DEMO_SHEET_CSE_B",
+      "folder_id": "DEMO_FOLDER_CSE_B",
+      "timetable": {
+        "Mon": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Tue": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Wed": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Thu": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Fri": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Sat": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ]
+      },
+      "status": "active",
+      "enrolled_students": [
+        {
+          "name": "Rahul_Gupta",
+          "roll_number": "CSE2025011",
+          "gender": "M"
+        },
+        {
+          "name": "Pooja_Desai",
+          "roll_number": "CSE2025012",
+          "gender": "F"
+        },
+        {
+          "name": "Nikhil_Joshi",
+          "roll_number": "CSE2025013",
+          "gender": "M"
+        },
+        {
+          "name": "Kavya_Rao",
+          "roll_number": "CSE2025014",
+          "gender": "F"
+        },
+        {
+          "name": "Siddharth_Kumar",
+          "roll_number": "CSE2025015",
+          "gender": "M"
+        },
+        {
+          "name": "Ishaan_Mehta",
+          "roll_number": "CSE2025016",
+          "gender": "M"
+        },
+        {
+          "name": "Tanvi_Shah",
+          "roll_number": "CSE2025017",
+          "gender": "F"
+        },
+        {
+          "name": "Aditya_Pandey",
+          "roll_number": "CSE2025018",
+          "gender": "M"
+        },
+        {
+          "name": "Riya_Choudhary",
+          "roll_number": "CSE2025019",
+          "gender": "F"
+        },
+        {
+          "name": "Harsh_Aggarwal",
+          "roll_number": "CSE2025020",
+          "gender": "M"
+        }
+      ],
+      "assigned_faculty_email": "faculty2@democollege.edu",
+      "assigned_faculty_id": 3
+    },
+    {
+      "id": "cam_cse_c",
+      "display_name": "CSE-C Lab 203",
+      "rtsp_url": "demo://cam_cse_c",
+      "sheet_name": "CSE-C",
+      "section_code": "CSE",
+      "year_start": 2025,
+      "year_end": 2026,
+      "section": "C",
+      "sheet_id": "DEMO_SHEET_CSE_C",
+      "folder_id": "DEMO_FOLDER_CSE_C",
+      "timetable": {
+        "Mon": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Tue": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Wed": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Thu": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Fri": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ],
+        "Sat": [
+          "Maths",
+          "PHY",
+          "CHE",
+          "CSE",
+          "ENG",
+          "EVS"
+        ]
+      },
+      "status": "idle",
+      "enrolled_students": [],
+      "assigned_faculty_email": null,
+      "assigned_faculty_id": null
+    }
+  ]
 }

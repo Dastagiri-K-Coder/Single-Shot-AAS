@@ -29,6 +29,7 @@ google-api-python-client>=2.100.0
 Flask==3.0.3
 flask-cors==4.0.0
 Flask-Session>=0.6.0
+bcrypt>=4.0.0          # v2.0: local ID+password login (bcrypt hashing)
 
 # --- Voice Command Trigger (offline) ---
 SpeechRecognition==3.10.4

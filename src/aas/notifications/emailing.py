@@ -6,8 +6,9 @@ Sends attendance status emails to students via Gmail SMTP.
 Credentials are loaded from .env — never hardcoded in source.
 
 Functions:
-    send_email(receiver_mail, attendance)  → attendance status notification
-    email_pin(email, pin)                  → send PIN to new enrollee
+    send_email(receiver_mail, attendance)          → attendance status notification
+    email_pin(email, pin)                          → send PIN to new enrollee
+    send_faculty_summary(faculty_email, ...)       → post-attendance summary to faculty (v2.0)
 """
 
 import smtplib
@@ -84,3 +85,44 @@ def email_pin(email: str, pin: int) -> None:
         f"— AI Attendance System"
     )
     _send(email, subject, body)
+
+
+def send_faculty_summary(
+    faculty_email: str,
+    section: str,
+    subject_name: str,
+    period: int,
+    present_count: int,
+    absent_names: list,
+) -> None:
+    """Send a post-attendance summary email to the faculty member.
+
+    v2.0 addition — called in a background thread after attendance confirmation
+    so it does not block the faculty's UI response.
+
+    Args:
+        faculty_email  : Faculty's email address (from camera config or user record).
+        section        : Section name (e.g. 'CSE-A').
+        subject_name   : Subject taken (e.g. 'DBMS').
+        period         : Period number (e.g. 3).
+        present_count  : Number of students marked present.
+        absent_names   : List of absent student names.
+    """
+    if not faculty_email:
+        return  # silently skip if no email configured
+
+    today       = datetime.date.today().strftime('%d %b %Y')
+    absent_list = "\n".join(f"  \u2022 {n}" for n in absent_names) if absent_names else "  (None)"
+    em_subject  = f"[AAS] {section} {subject_name} P{period} \u2014 Attendance Summary"
+    body = (
+        f"Hello,\n\n"
+        f"Attendance has been submitted for:\n"
+        f"  Section : {section}\n"
+        f"  Subject : {subject_name}  |  Period {period}\n"
+        f"  Date    : {today}\n\n"
+        f"  \u2705 Present : {present_count}\n"
+        f"  \u274c Absent  : {len(absent_names)}\n\n"
+        f"Absent students:\n{absent_list}\n\n"
+        f"\u2014 Single Shot AAS"
+    )
+    _send(faculty_email, em_subject, body)

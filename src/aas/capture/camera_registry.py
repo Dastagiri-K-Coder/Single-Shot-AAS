@@ -13,6 +13,11 @@ Functions:
     delete_camera(cam_id)       → Remove a camera
     save_cameras(cameras_list)  → Persist to cameras.json
     get_cameras_json_path()     → Absolute path to cameras.json
+
+New in v2.0:
+    capture_mode           : "rtsp" | "webcam" | "mobile_upload" (default: mobile_upload)
+    assigned_faculty_email : email of faculty assigned to this camera/section
+    faculty_name           : display name of assigned faculty
 """
 
 import os
@@ -50,20 +55,38 @@ def _default_camera(
         "year_end":            year_end,
         "section":             section,
         "serial":              1,           # updated on creation
+        # v2.0 fields
+        "capture_mode":           "mobile_upload",  # "rtsp" | "webcam" | "mobile_upload"
+        "assigned_faculty_email": "",
+        "faculty_name":           "",
     }
 
 
 # ── Read ──────────────────────────────────────────────────────────────────────
 
 def load_cameras() -> list[dict]:
-    """Load all cameras from cameras.json. Returns empty list if file missing."""
+    """Load all cameras from cameras.json. Returns empty list if file missing.
+
+    Backward-compatible: v1 entries without v2 fields receive safe defaults.
+    """
+    _V2_DEFAULTS = {
+        "capture_mode":           "mobile_upload",
+        "assigned_faculty_email": "",
+        "faculty_name":           "",
+    }
     with _registry_lock:
         if not os.path.exists(CAMERAS_JSON_PATH):
             return []
         try:
             with open(CAMERAS_JSON_PATH, "r") as f:
                 data = json.load(f)
-            return data.get("cameras", [])
+            cameras = data.get("cameras", [])
+            # Inject missing v2 fields into legacy entries (non-destructive)
+            for cam in cameras:
+                for key, default in _V2_DEFAULTS.items():
+                    if key not in cam:
+                        cam[key] = default
+            return cameras
         except Exception as e:
             print(f"  [CameraRegistry] Error loading cameras.json: {e}")
             return []

@@ -1,0 +1,932 @@
+SINGLE SHOT 2AS DESIGN, ARCHITECTURE, IMPLEMENTATION, AND PRODUCTION
+HARDENING OF AN EDGE-TO-CLOUD MULTI-CAMERA AUTOMATED ATTENDANCE SYSTEM
+
+Project: Single Shot 2AS (Single Shot Automated Attendance System)
+Author: Kummarapalli Dastagiri Current Source Version: v2.0 — Faculty
+Handset-Based System Proposed Engineering Extension: v2.5 Production
+Architecture Python Runtime: 3.10.x Primary Entry Point: main.py –web /
+attendance.service
+
+DOCUMENT STATUS
+
+This document consolidates the supplied Single Shot 2AS technical paper
+with the v2.5 production-hardening specification developed from that
+paper.
+
+IMPORTANT VERSION DISTINCTION
+
+Everything described as v2.0 represents the supplied technical paper and
+its documented implementation. The v2.5 sections are proposed
+engineering extensions. They should not be interpreted as already
+implemented unless the project source code independently confirms them.
+
+====================================================================== 1.
+EXECUTIVE ABSTRACT
+======================================================================
+
+Single Shot 2AS is an edge-to-cloud automated attendance management
+platform designed to capture and authenticate an entire classroom cohort
+from a single high-resolution classroom image. The supplied v2.0
+architecture combines local authentication, role-based access control,
+multiple camera ingestion modes, computer-vision recognition, Google
+Drive/Sheets synchronization, three-level attendance fallback, offline
+voice processing, and a Progressive Web App.
+
+The v2.0 system is organized around eight synchronized subsystems:
+
+1.  Local Authentication and Session Management: SQLite-backed
+    authentication, bcrypt password hashing with rounds=12, UUID4
+    session tokens with eight-hour expiry, account lockout after five
+    failed attempts, and audit logging. Google OAuth is retained for
+    Google Sheets/Drive API access rather than primary daily login.
+
+2.  Role-Based Access Control: Admin and faculty roles. Faculty access
+    is scoped to assigned sections and cameras, while administrators
+    have broader system access.
+
+3.  Multi-Mode Camera Ingestion: RTSP camera, fixed IP camera, local
+    webcam, and faculty smartphone HTTP multipart upload. Smartphone
+    upload is the primary v2.0 capture mode.
+
+4.  Standards-Compliant Vision Pipeline: Quality gating, adaptive
+    resolution scaling, OpenCV YuNet with dlib HOG/CNN fallbacks, IEC
+    62676-4 and ISO/IEC 19794-5 resolution checks, and 128-dimensional
+    metric embeddings.
+
+5.  Google Drive/Sheets Backend: Google Drive and Google Sheets are used
+    as the cloud reporting and synchronization layer. Attendance columns
+    can encode subject and period, such as “9/17 DBMS P3”. Batch updates
+    reduce API request volume.
+
+6.  Three-Level Attendance Fallback: L1 manual student toggle, L2
+    individual close-up retake, and L3 bulk manual addition.
+
+7.  Voice and TTS: Offline Vosk speech recognition, debounce protection,
+    and pyttsx3/espeak speech synthesis.
+
+8.  Progressive Web App: Flask-served PWA allowing faculty to use a
+    smartphone browser as the primary capture interface without APK
+    distribution.
+
+The supplied paper reports 90 unit test functions across 12 unit-test
+files, plus web-route integration tests.
+
+The proposed v2.5 architecture preserves this foundation but introduces
+a persistent attendance state machine, durable local attendance records,
+recognition jobs, a synchronization outbox, idempotent operations,
+explicit recovery behavior, worker-based processing, structured
+observability, and clear API/database boundaries.
+
+======================================================================
+2. SYSTEM OBJECTIVES
+======================================================================
+
+The supplied v2.0 paper defines the following major objectives:
+
+-   Single-shot classroom attendance for approximately 35-60 students.
+-   Smartphone-based high-resolution classroom capture.
+-   Local computer-vision inference.
+-   Offline operation of the vision and voice components.
+-   Institutional multi-section and multi-camera support.
+-   Standards-oriented face-quality gating.
+-   Google Sheets/Drive synchronization.
+-   Faculty/admin RBAC.
+-   Three-level correction for missed students.
+-   PWA-based faculty workflow.
+
+The v2.5 engineering objective is:
+
+CAPTURE -> RECOGNIZE -> VERIFY -> DURABLY COMMIT LOCALLY -> SYNCHRONIZE
+
+rather than making cloud synchronization part of the fundamental
+attendance transaction.
+
+======================================================================
+3. SYSTEM TOPOLOGY — v2.0
+======================================================================
+
+Faculty Smartphone Classroom Microphone Admin Browser | | | | HTTP
+upload | Offline voice | Web browser v v v +——————————————————————–+ |
+MASTER EDGE NODE | | | | Local Auth / RBAC / SQLite / Flask / Voice /
+Capture | | | | Capture modes: RTSP | IP Camera | Webcam | Mobile Upload
+| | | | | v | | Computer Vision Recognition | | Quality -> Scale ->
+Detect -> Standards -> Match | | | | | TTS | Fallback L1/L2/L3 | Email
+Summary | +——————————————————————–+ | | Google APIs v
++——————————————————————–+ | GOOGLE CLOUD | | Drive hierarchy + Google
+Sheets attendance ledger | +——————————————————————–+
+
+======================================================================
+4. v2.0 AUTHENTICATION AND RBAC
+======================================================================
+
+The existing SQLite schema contains:
+
+TABLE users - id - user_id - full_name - role - password_hash - email -
+assigned_cameras - is_active - is_locked - failed_attempts -
+must_change_password - created_at - last_login - created_by
+
+TABLE sessions - session_token - user_id - role - created_at -
+expires_at - ip_address
+
+TABLE audit_log - id - timestamp - user_id - action - details -
+ip_address
+
+Database settings documented by the paper: - journal_mode = WAL -
+foreign_keys = ON - synchronous = NORMAL
+
+Password security: - bcrypt - rounds = 12 - plaintext passwords are not
+stored or logged.
+
+Session behavior: - UUID4 token - eight-hour expiry - session validity
+requires an active user and unexpired session.
+
+RBAC: - admin can access all cameras. - faculty access is limited to
+assigned cameras/sections.
+
+======================================================================
+5. CAMERA AND CAPTURE ARCHITECTURE
+======================================================================
+
+Four documented capture modes:
+
+A. RTSP cv2.VideoCapture(rtsp_url), including a warm-up sequence.
+
+B. Fixed IP camera Configured through IP_CAMERA_URL.
+
+C. Local webcam Used when network-camera sources are not selected.
+
+D. Mobile upload Faculty smartphone sends a classroom image through HTTP
+multipart upload. This is the primary v2.0 capture mode.
+
+The existing camera registry contains fields including: - id -
+display_name - rtsp_url - sheet_id - drive_folder_id -
+encodings_subfolder - section_code - year_start - year_end - section -
+serial - capture_mode - assigned_faculty_email - faculty_name
+
+A camera lock is used to prevent conflicting camera access.
+
+======================================================================
+6. COMPUTER VISION PIPELINE
+======================================================================
+
+Documented v2.0 pipeline:
+
+RAW CLASSROOM IMAGE | v 1. QUALITY GATING - minimum image dimensions -
+brightness threshold - Laplacian-variance sharpness test | v 2. ADAPTIVE
+SCALING - width >= 3840 px -> 0.5x - width >= 2560 px -> 0.75x - width <
+2560 px -> 1.0x | v 3. FACE DETECTION - OpenCV YuNet FPN - dlib HOG
+fallback - optional dlib CNN | v 4. BIOMETRIC STANDARDS GATING - native
+face width >= 80 px - native face height >= 80 px - IPD >= 30 px | v 5.
+EMBEDDING / MATCHING - 128-dimensional metric embedding - Euclidean face
+distance - configured tolerance documented as 0.55 | v ATTENDANCE RESULT
+
+Detection statuses include: - valid - low_resolution - low_ipd
+
+The paper specifically documents that substandard detections are
+excluded from matching.
+
+======================================================================
+7. ENROLLMENT
+======================================================================
+
+Documented enrollment modes:
+
+1.  CLI 3-angle webcam: Front / Left / Right.
+
+2.  Web photo upload: Up to three JPEG/PNG images.
+
+3.  Browser webcam: Base64 images posted per angle.
+
+4.  Batch folder enrollment: Uses the documented filename convention for
+    gender.
+
+Enrollment downstream actions include: - adding the student to the
+Google Sheet, - generating a security PIN, - optional PIN email, -
+hot-reloading the facial encoding cache.
+
+Encoding files are organized globally and/or by camera.
+
+======================================================================
+8. GOOGLE DRIVE / SHEETS ARCHITECTURE
+======================================================================
+
+The documented Drive hierarchy uses: - application root - institution
+configuration - section folders - attendance spreadsheet - classroom
+audit snapshots.
+
+Worksheet schema: - Column 1: Name - Column 2: Email - Column 3:
+Gender - Column 4: PIN - Column 5+: date/subject-period attendance
+columns.
+
+Example subject-period column: “9/17 DBMS P3”
+
+The documented batch mutation strategy: 1. Read worksheet headers. 2.
+Create the target date/period column if necessary. 3. Map student names
+to worksheet rows. 4. Construct the batch payload. 5. Perform one
+batch_update() operation.
+
+The paper also documents exponential backoff for selected Google API
+transient errors including 429, 500, 502, 503 and 504.
+
+======================================================================
+9. THREE-LEVEL ATTENDANCE FALLBACK
+======================================================================
+
+L1 — Manual Toggle
+
+Used for small discrepancies and missed students.
+
+L2 — Individual Close-Up Retake
+
+Faculty captures an individual student. The documented implementation
+can temporarily restrict the recognition engine to that student’s
+encodings.
+
+L3 — Bulk Manual Addition
+
+Faculty selects multiple enrolled students and marks them present.
+
+Finalization in v2.0 releases the camera lock, resolves Google
+credentials, writes the attendance event, and dispatches the faculty
+summary.
+
+======================================================================
+10. PWA AND WEB API
+======================================================================
+
+The PWA includes: - manifest.json - service worker - standalone
+display - portrait orientation - 192px and 512px icons.
+
+Documented API surface includes: - /api/status - /api/students -
+/api/enroll/upload - /api/enroll/webcam - /api/attendance/override -
+/api/attendance/finalize - /api/attendance/today - /take-attendance -
+/upload-photo - /take-attendance-individual - /api/cameras -
+/api/cameras//status - /api/camera//lock-status - /api/camera/stream -
+/api/faculty/cameras - /api/timetable/ - /api/settings - admin
+user-management routes.
+
+The camera stream is login protected and has a documented five-minute
+safety timeout.
+
+======================================================================
+11. TEST ARCHITECTURE
+======================================================================
+
+The supplied paper reports 90 unit test functions across 12 test files
+plus integration tests.
+
+Documented test areas include: - recognition standards - adaptive
+scaling - gender-aware recognition - encoding loading - spreadsheet
+batch mutation - Drive operations - email dispatch - OAuth flow -
+RestrictedUnpickler RCE defense - TTS phrase formatting - Flask route
+integration.
+
+Important validated behaviors documented in the paper: - face crops
+below the documented size thresholds are rejected from matching; -
+adaptive scale thresholds behave as specified; - malicious pickle
+payloads are blocked; - batch attendance writing invokes batch_update
+once; - TTS output follows the required fixed phrase.
+
+======================================================================
+12. v2.5 PRODUCTION ARCHITECTURE
+======================================================================
+
+The v2.5 proposal does not replace the v2.0 recognition or capture
+design.
+
+It changes the durability model.
+
+CURRENT CONCEPT: Capture -> Recognition -> Google Sheet
+
+PROPOSED: Capture -> Attendance Session -> Recognition Job -> Human
+Verification -> Local SQLite Commit -> Durable Outbox -> Google Sync
+
+This separates the operational attendance transaction from the cloud
+synchronization transaction.
+
+======================================================================
+13. v2.5 ATTENDANCE SESSION STATE MACHINE
+======================================================================
+
+SYSTEM READY | v SESSION CREATED | v IMAGE RECEIVED | v QUALITY CHECK |
+v RECOGNITION | v HUMAN REVIEW | v FINALIZED | v LOCAL COMMITTED | v
+SYNC PENDING | v SYNCHRONIZED
+
+Failure/recovery states: - FAILED - CANCELLED - SYNC_FAILED -
+RETRY_WAIT - INTERRUPTED
+
+Illegal state transitions must be rejected.
+
+======================================================================
+14. v2.5 DATABASE SPECIFICATION
+======================================================================
+
+Existing tables remain: - users - sessions - audit_log
+
+New proposed tables:
+
+14.1 attendance_sessions
+
+Primary key: - session_id
+
+Core fields: - camera_id - faculty_user_id - section_code - subject -
+subject_abbr - period - attendance_date - source_mode - status -
+image_path - recognized_count - unknown_count - low_res_count -
+manual_override_count - total_faces - recognition_model -
+recognition_model_version - recognition_config_version - started_at -
+updated_at - finalized_at - local_committed_at - synchronized_at -
+sync_status - last_error
+
+14.2 attendance_records
+
+Each student decision belongs to an attendance session.
+
+Fields: - id - session_id - student_name - student_email - status -
+source - confidence - detection_status - face_width - face_height -
+ipd - modified_by - created_at - updated_at
+
+Suggested status: - PRESENT - ABSENT
+
+Suggested source: - AUTO_RECOGNITION - MANUAL_L1 - INDIVIDUAL_L2 -
+BULK_L3 - SYSTEM
+
+14.3 recognition_jobs
+
+Fields: - job_id - session_id - image_path - status - detector -
+recognition_model - model_version - scale_factor - match_tolerance -
+started_at - completed_at - result_json - error_message
+
+14.4 sync_outbox
+
+Fields: - id - event_id - session_id - operation - target_type -
+target_id - payload_json - idempotency_key - status - attempt_count -
+next_attempt_at - last_attempt_at - last_error - created_at -
+synchronized_at
+
+The outbox is the durable bridge between local attendance and Google
+synchronization.
+
+======================================================================
+15. v2.5 TRANSACTION MODEL
+======================================================================
+
+Attendance finalization should use one local transaction:
+
+BEGIN TRANSACTION
+
+1.  Verify session ownership.
+2.  Verify session state.
+3.  Validate attendance records.
+4.  Persist final session state.
+5.  Persist student attendance records.
+6.  Create synchronization outbox event.
+7.  Mark session LOCAL_COMMITTED.
+
+COMMIT
+
+If any operation fails: ROLLBACK.
+
+Only after local commit succeeds should the user be told that attendance
+has been saved.
+
+Google synchronization is then performed independently.
+
+======================================================================
+16. v2.5 IDEMPOTENCY
+======================================================================
+
+Every synchronization event receives: - event_id - idempotency_key
+
+The idempotency key must uniquely identify the logical attendance
+operation.
+
+A repeated finalize request with the same key must return the existing
+result rather than create a duplicate event.
+
+This protects against: - browser retries, - network retries, - double
+taps, - process recovery, - synchronization retries.
+
+======================================================================
+17. v2.5 SYNCHRONIZATION WORKER
+======================================================================
+
+OUTBOX | v PENDING | v PROCESSING | +—- SUCCESS —-> SYNCHRONIZED | +—-
+FAILURE —-> RETRY_WAIT | v PROCESSING
+
+After a defined retry limit: PERMANENT_FAILURE
+
+The existing exponential-backoff mechanism should be retained and
+integrated with this durable state.
+
+======================================================================
+18. v2.5 WORKER ARCHITECTURE
+======================================================================
+
+HTTP requests should not be responsible for unlimited CPU-heavy
+recognition or long-running synchronization.
+
+Proposed logical workers:
+
+1.  WEB WORKER Handles HTTP requests and lightweight validation.
+
+2.  CV WORKER Processes recognition jobs.
+
+3.  SYNC WORKER Processes durable Google synchronization events.
+
+4.  OPTIONAL NOTIFICATION WORKER Handles email/TTS tasks that do not
+    need to block the attendance commit.
+
+Logical topology:
+
+Faculty Phone | v HTTP/Web Layer | v Attendance Session | v CV Job Queue
+| v Recognition Worker | v Human Review | v SQLite | v Sync Outbox | v
+Sync Worker | v Google APIs
+
+This worker separation is a proposed v2.5 design.
+
+======================================================================
+19. v2.5 UPLOAD SECURITY BOUNDARY
+======================================================================
+
+The proposed upload pipeline is:
+
+Authentication | Camera authorization | Content-Type validation |
+Maximum request-size validation | Temporary file | Actual image decode |
+Dimension validation | Quality validation | Atomic rename | Attendance
+session
+
+Filename extension and client-supplied Content-Type must not be treated
+as proof that a file is a valid image.
+
+======================================================================
+20. v2.5 API SPECIFICATION
+======================================================================
+
+New v2.5 APIs are proposed under:
+
+/api/v2/
+
+The current v2.0 endpoints should remain available during migration.
+
+20.1 Attendance
+
+POST /api/v2/attendance/sessions GET /api/v2/attendance/sessions/{id}
+POST /api/v2/attendance/sessions/{id}/image GET
+/api/v2/attendance/sessions/{id}/status GET
+/api/v2/attendance/sessions/{id}/records POST
+/api/v2/attendance/sessions/{id}/override POST
+/api/v2/attendance/sessions/{id}/retry-student POST
+/api/v2/attendance/sessions/{id}/finalize POST
+/api/v2/attendance/sessions/{id}/cancel
+
+20.2 Cameras
+
+GET /api/v2/cameras POST /api/v2/cameras DELETE
+/api/v2/cameras/{camera_id} GET /api/v2/cameras/{camera_id}/status GET
+/api/v2/cameras/{camera_id}/lock
+
+20.3 Enrollment
+
+GET /api/v2/students POST /api/v2/enroll/upload POST
+/api/v2/enroll/webcam DELETE /api/v2/students/{student_id}
+
+20.4 Timetable
+
+GET /api/v2/timetable/{camera_id} PUT /api/v2/timetable/{camera_id}
+
+20.5 Synchronization
+
+GET /api/v2/sync/status GET /api/v2/sync/events POST
+/api/v2/sync/events/{event_id}/retry
+
+20.6 System
+
+GET /api/v2/system/health GET /api/v2/system/readiness GET
+/api/v2/system/version
+
+======================================================================
+21. v2.5 API RESPONSE MODEL
+======================================================================
+
+Success:
+
+{ “success”: true, “data”: {}, “error”: null, “request_id”: “…” }
+
+Failure:
+
+{ “success”: false, “data”: null, “error”: { “code”:
+“SESSION_NOT_FOUND”, “message”: “Attendance session was not found.” },
+“request_id”: “…” }
+
+Proposed HTTP statuses: - 200 OK - 201 Created - 202 Accepted - 400 Bad
+Request - 401 Unauthorized - 403 Forbidden - 404 Not Found - 409
+Conflict - 413 Payload Too Large - 422 Unprocessable Entity - 500
+Internal Server Error - 503 Service Unavailable
+
+======================================================================
+22. v2.5 ERROR CODES
+======================================================================
+
+AUTH_REQUIRED AUTH_INVALID ACCESS_DENIED
+
+CAMERA_NOT_FOUND CAMERA_NOT_ASSIGNED CAMERA_BUSY CAMERA_UNAVAILABLE
+
+SESSION_NOT_FOUND SESSION_INVALID_STATE SESSION_ALREADY_FINALIZED
+
+IMAGE_MISSING IMAGE_TOO_LARGE IMAGE_INVALID IMAGE_LOW_QUALITY
+IMAGE_TOO_BLURRY
+
+RECOGNITION_FAILED RECOGNITION_JOB_NOT_FOUND
+
+STUDENT_NOT_FOUND ENROLLMENT_FAILED
+
+TIMETABLE_NOT_FOUND TIMETABLE_INVALID
+
+SYNC_PENDING SYNC_FAILED SYNC_EVENT_NOT_FOUND
+
+IDEMPOTENCY_CONFLICT VALIDATION_ERROR INTERNAL_ERROR
+
+======================================================================
+23. v2.5 RECOVERY ARCHITECTURE
+======================================================================
+
+Failure: phone disconnects
+
+Preserve the persistent session. Do not lose already uploaded data.
+
+Failure: malformed image
+
+Reject before recognition and record the failure.
+
+Failure: recognition crash
+
+Mark the recognition job failed/interrupted and permit retry.
+
+Failure: browser refresh
+
+Reload the persistent attendance session by session_id.
+
+Failure: Google API unavailable
+
+Keep the attendance locally committed and leave the outbox event
+pending.
+
+Failure: internet disappears
+
+Continue local operation. Synchronize when connectivity returns.
+
+Failure: power loss after local commit
+
+Recover the pending outbox event during startup.
+
+Failure: duplicate finalize
+
+Use the idempotency key and return the existing operation result.
+
+Failure: camera unavailable
+
+Release/recover the camera resource and preserve the attendance session
+where possible.
+
+======================================================================
+24. v2.5 OBSERVABILITY
+======================================================================
+
+Proposed structured events:
+
+AUTH_LOGIN AUTH_FAILURE SESSION_CREATED IMAGE_RECEIVED IMAGE_REJECTED
+RECOGNITION_STARTED RECOGNITION_COMPLETED MANUAL_OVERRIDE
+SESSION_FINALIZED LOCAL_COMMIT SYNC_STARTED SYNC_SUCCESS SYNC_FAILURE
+CAMERA_FAILURE SYSTEM_RECOVERY
+
+Each event should support: - timestamp - event_id - user_id -
+session_id - camera_id - severity - message - metadata
+
+The existing audit_log remains the foundation for security-related
+auditing.
+
+======================================================================
+25. v2.5 HEALTH AND READINESS
+======================================================================
+
+Health answers: “Is the application alive?”
+
+Readiness answers: “Can the system currently perform the required
+operation?”
+
+Example readiness:
+
+{ “application”: true, “database”: true, “recognition_engine”: true,
+“camera_registry”: true, “storage”: true, “google_sync”: false }
+
+A temporary Google synchronization outage should not automatically make
+local attendance unavailable in the proposed local-first architecture.
+
+======================================================================
+26. v2.5 BIOMETRIC DATA LIFECYCLE
+======================================================================
+
+The existing paper stores: - enrollment photos - facial encodings -
+classroom captures - annotated classroom images.
+
+The production specification should explicitly define:
+
+ENROLL | v STORE | v RECOGNIZE | v ATTENDANCE RESULT | v RETENTION
+POLICY | v DELETE / ARCHIVE
+
+The supplied paper does not specify an institutional retention period.
+Therefore no specific retention duration is asserted here.
+
+======================================================================
+27. v2.5 RECOGNITION PROVENANCE
+======================================================================
+
+Every recognition job should record:
+
+-   session_id
+-   image_id/path
+-   recognition_job_id
+-   detector
+-   recognition_model
+-   model_version
+-   recognition_scale
+-   match tolerance
+-   timestamp
+-   result
+
+The supplied v2.0 paper documents the recognition scale behavior and
+matching tolerance; model/config version tracking is a proposed v2.5
+addition.
+
+======================================================================
+28. v2.5 CONFIGURATION VERSIONING
+======================================================================
+
+The existing system uses: - cameras.json - institution.json -
+timetable.json - faculty_registry.json - environment/configuration
+settings.
+
+A v2.5 attendance session should record the versions/configuration
+identities used to create its result.
+
+Proposed: - camera_config_version - timetable_version -
+recognition_config_version - enrollment/encoding snapshot identity
+
+This makes historical troubleshooting possible without changing the
+attendance result after the fact.
+
+======================================================================
+29. v2.5 MODULE STRUCTURE
+======================================================================
+
+Single Shot AAS/ | +– main.py +– attendance.service +– Dockerfile +–
+pyproject.toml +– requirements.txt +– requirements-dev.txt +– setup.sh |
++– config/ | +– aas_users.db | +– cameras.json | +– institution.json |
++– timetable.json | +– faculty_registry.json | +– data/ | +–
+known_face_photos/ | +– known_face_encodings/ | +– captured/ | +–
+src/aas/ | +– core/ | +– config.py | +– auth.py | +– db.py | +– roles.py
+| +– safe_pickle.py | +– retry.py | +– capture/ | +– capture.py | +–
+camera_registry.py | +– recognition/ | +– engine.py | +– detectors.py |
++– metrics.py | +– enrollment/ | +– enroll.py | +– attendance/ | +–
+session.py | +– state_machine.py | +– repository.py | +– records.py | +–
+overrides.py | +– sync/ | +– outbox.py | +– worker.py | +–
+google_sheets.py | +– integrations/google/ | +– drive_manager.py | +–
+oauth.py | +– notifications/ | +– emailing.py | +– tts.py | +– voice/ |
++– voice_trigger.py | +– observability/ | +– audit.py | +– logging.py |
++– health.py | +– web/ +– app.py +– routes/ | +– auth.py | +–
+attendance.py | +– enrollment.py | +– cameras.py | +– admin.py +–
+templates/ +– static/
+
+The original modules remain recognizable. The proposed additions
+separate attendance lifecycle, synchronization, and observability
+concerns.
+
+======================================================================
+30. v2.5 TEST STRATEGY
+======================================================================
+
+The existing 90-unit-test baseline should be preserved.
+
+Additional proposed test categories:
+
+1.  State-machine transition tests
+2.  Session persistence tests
+3.  Browser-refresh recovery tests
+4.  Recognition-job recovery tests
+5.  Outbox durability tests
+6.  Idempotency tests
+7.  Google API outage tests
+8.  Retry/backoff tests
+9.  Upload security tests
+10. Cross-camera RBAC tests
+11. Concurrent-session tests
+12. SQLite transaction rollback tests
+13. Power-loss simulation tests
+14. Sync-worker tests
+15. Configuration-version tests
+
+Critical integration scenario:
+
+CREATE SESSION -> UPLOAD -> RECOGNIZE -> HUMAN REVIEW -> FINALIZE ->
+LOCAL COMMIT -> OUTBOX -> GOOGLE SYNC -> SYNCHRONIZED
+
+======================================================================
+31. FAILURE AND RECOVERY MATRIX
+======================================================================
+
+Failure Expected behavior
+
+Phone disconnects Preserve session Huge upload Reject before CV Corrupt
+image Reject and log Low quality Request retake Low face resolution
+Exclude from automatic matching Recognition crash Mark job
+failed/recoverable Google unavailable Keep local attendance committed
+Internet outage Outbox remains pending Power loss after commit Recover
+pending outbox Browser refresh Reload session Duplicate submission
+Idempotent response Camera unavailable Release/retry resource Invalid
+timetable Prevent ambiguous automatic assignment Database transaction
+failure Roll back incomplete operation Malformed encoding
+Quarantine/reject unsafe data
+
+======================================================================
+32. END-TO-END v2.5 FLOW
+======================================================================
+
+FACULTY | | Take Attendance v CREATE ATTENDANCE SESSION | v UPLOAD
+CLASSROOM IMAGE | v SECURITY + IMAGE VALIDATION | v RECOGNITION JOB |
++–> QUALITY +–> ADAPTIVE SCALE +–> DETECTION +–> IEC/ISO GATING +–>
+128-D MATCHING | v HUMAN VERIFICATION | +–> L1 MANUAL TOGGLE +–> L2
+CLOSE-UP RETAKE +–> L3 BULK ADD | v FINALIZE | v SQLITE TRANSACTION |
++–> SESSION +–> ATTENDANCE RECORDS +–> SYNC OUTBOX | v LOCAL COMMITTED |
+v FACULTY RECEIVES SUCCESS | v SYNC WORKER | v GOOGLE SHEETS / DRIVE | v
+SYNCHRONIZED
+
+======================================================================
+33. ARCHITECTURAL PRINCIPLES
+======================================================================
+
+1.  Local attendance must not depend on WAN availability.
+
+2.  Recognition and attendance decision are separate concepts.
+
+3.  Human correction is a first-class workflow, not an exception hidden
+    inside the recognition engine.
+
+4.  SQLite is the proposed operational source of truth for v2.5
+    attendance.
+
+5.  Google Sheets/Drive remains the cloud reporting/synchronization
+    destination.
+
+6.  Synchronization must be durable and retryable.
+
+7.  Repeated requests must be idempotent.
+
+8.  Every attendance session must have a persistent identity.
+
+9.  Every manual correction must have provenance.
+
+10. Recognition configuration should be traceable.
+
+11. HTTP handlers should remain thin; business logic belongs in
+    services.
+
+12. Failure recovery must be designed explicitly rather than inferred
+    from exception handling.
+
+======================================================================
+34. ENGINEERING SUMMARY
+======================================================================
+
+Single Shot 2AS v2.0 provides the foundational architecture for a
+faculty-handset-based automated attendance system. Its core strengths
+are the combination of local authentication, multi-mode capture, edge
+recognition, standards-oriented image-quality gating, subject-period
+attendance columns, three-level correction, RBAC, offline voice
+processing, and PWA delivery.
+
+The production-hardening work represented by v2.5 does not require
+replacing those concepts.
+
+The central evolution is the introduction of durable state:
+
+CAPTURE -> RECOGNITION -> HUMAN VERIFICATION -> LOCAL COMMIT -> DURABLE
+OUTBOX -> CLOUD SYNCHRONIZATION
+
+This transforms the cloud synchronization layer from a critical part of
+the attendance transaction into a recoverable downstream process.
+
+The resulting architecture can therefore tolerate, subject to
+implementation and validation: - temporary internet failure, - browser
+refresh, - duplicate requests, - recognition-job interruption, -
+synchronization failure, - process restart, - and power loss after a
+successful local transaction.
+
+These v2.5 capabilities are engineering proposals derived from the
+existing v2.0 architecture and should be validated through
+implementation, integration testing, and real deployment measurements
+before being described as completed system properties in a publication.
+
+======================================================================
+35. CLAIMS REQUIRING EMPIRICAL VALIDATION
+======================================================================
+
+Before publication, the following claims should be backed by measured
+experiments rather than architecture alone:
+
+-   end-to-end attendance latency,
+-   classroom-size recognition throughput,
+-   recognition precision/recall,
+-   false acceptance and false rejection rates,
+-   rear-row recognition performance,
+-   Raspberry Pi versus x86 processing time,
+-   memory consumption,
+-   Google synchronization latency,
+-   behavior under sustained classroom load,
+-   actual operational cost,
+-   network-outage recovery,
+-   biometric-data retention behavior,
+-   and production security testing.
+
+The supplied paper reports a “<3 sec” throughput figure, “$0” recurring
+cost, and “100% offline” operation in its comparative analysis. Those
+values are documented source claims, but production publication should
+distinguish architectural capability from experimentally measured
+deployment results.
+
+======================================================================
+36. ORIGINAL v2.0 COMPARATIVE ARCHITECTURE
+======================================================================
+
+Feature Traditional Cloud CV v1.0 v2.0
+
+Throughput Sequential Parallel <3 sec <3 sec Recurring Cost $200/yr
+$4,000+ $0 $0 Login Badge/PIN Cloud Google Local bcrypt Biometric
+Privacy Proprietary Vendor On-prem On-prem Offline Operation Local sync
+Failure 100% 100% Camera Cost $300-800 Variable $40-80 $0 phone Camera
+Resolution N/A Fixed 5-8 MP 48-108 MP Multi-Subject/Day One entry
+Config. Date col Subject-period Missed Student Fix Rescan Retry API None
+3-level RBAC Fixed admin Login Admin Admin+Faculty PWA N/A N/A N/A Full
+PWA
+
+The comparative values above are reproduced from the supplied technical
+paper. They should be experimentally qualified where they represent
+performance or operational-cost claims.
+
+======================================================================
+37. TECHNICAL REFERENCES
+======================================================================
+
+1.  IEC. IEC 62676-4: Video surveillance systems — Part 4: Application
+    guidelines. Geneva, 2014.
+
+2.  ISO. ISO/IEC 19794-5: Biometric data interchange formats — Part 5:
+    Face image data. Geneva, 2011.
+
+3.  King, Davis E. “Dlib-ml: A Machine Learning Toolkit.” JMLR 10, 2009.
+
+4.  Schroff, Florian, et al. “FaceNet: A unified embedding for face
+    recognition.” CVPR, 2015.
+
+5.  Alpha Cephei. “Vosk: Offline Speech Recognition API.” 2020.
+
+6.  OpenCV. “Face Detection using YuNet and SFace in OpenCV Zoo.” 2023.
+
+7.  Google LLC. “Google Sheets API v4 and Google Drive API v3
+    Documentation.”
+
+    2024. 
+
+8.  MDN. “MediaDevices.getUserMedia() — Web APIs.” Mozilla Foundation,
+    2024.
+
+9.  W3C. “Web Application Manifest — Progressive Web Apps.” 2023.
+
+10. Provos & Mazieres. “A Future-Adaptable Password Scheme.”
+    USENIX, 1999. (bcrypt)
+
+11. Flask/Pallets. “Flask Web Development.” 2024.
+
+======================================================================
+38. FINAL ARCHITECTURAL STATEMENT
+======================================================================
+
+Single Shot 2AS is structured around an edge-first attendance workflow
+in which classroom capture and biometric processing remain local while
+Google Drive/Sheets provides the existing cloud reporting and
+synchronization layer.
+
+The v2.5 production architecture preserves the documented v2.0
+mechanisms while introducing a durable transaction boundary:
+
+ATTENDANCE EXISTS LOCALLY FIRST. CLOUD SYNCHRONIZATION HAPPENS
+AFTERWARD.
+
+The proposed system boundary is therefore:
+
+Faculty Phone -> Secure API -> Persistent Attendance Session ->
+Recognition Worker -> Human Verification -> SQLite Local Commit ->
+Durable Sync Outbox -> Google Sheets/Drive
+
+This specification provides the logical foundation for implementing the
+next production-hardening phase without discarding the existing Single
+Shot 2AS v2.0 architecture.

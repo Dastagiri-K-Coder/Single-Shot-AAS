@@ -1102,3 +1102,343 @@ input[type="file"] { display: none; }
   .stats-grid   { grid-template-columns: 1fr; }
   .tab-bar      { flex-direction: column; }
 }
+
+/* ===================================================================
+   FACULTY MOBILE UI (A2) — Phone-first attendance experience
+=================================================================== */
+
+/* ── Utility ─────────────────────────────────────────────────────── */
+.hidden { display: none !important; }
+
+/* ── Faculty Layout Root ─────────────────────────────────────────── */
+body.faculty-layout {
+  background: #0f1117;
+  overflow-x: hidden;
+}
+.faculty-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 0;
+  gap: 0;
+}
+.admin-view {
+  /* visible by default for admin layout; hidden via JS for faculty */
+}
+
+/* ── Faculty Header Card ─────────────────────────────────────────── */
+.faculty-header-card {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 16px 20px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.faculty-header-card .faculty-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: -0.01em;
+}
+.faculty-header-card .period-info {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.faculty-header-card .camera-label {
+  font-size: 0.7rem;
+  color: #6366f1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Take Attendance CTA Button ─────────────────────────────────── */
+.take-attendance-btn {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 20px 16px;
+  padding: 18px 24px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  font-family: inherit;
+}
+.take-attendance-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+.take-attendance-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Camera Preview ──────────────────────────────────────────────── */
+.camera-preview-container {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+}
+.camera-preview-container video#camera-feed {
+  width: 100%;
+  flex: 1;
+  object-fit: cover;
+}
+.camera-capture-controls {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.capture-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+}
+.capture-btn:active { transform: scale(0.93); }
+.cancel-camera-btn {
+  color: #f1f5f9;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Recognition Result Cards ────────────────────────────────────── */
+.result-cards-container {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.result-summary-banner {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #10b981;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.result-summary-banner.has-absent {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+/* ── Absent Students List ────────────────────────────────────────── */
+.absent-list-container {
+  padding: 0 16px 12px;
+}
+.absent-list-header {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.absent-student-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  gap: 8px;
+}
+.absent-student-row .student-name {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mark-present-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.mark-present-btn:active { background: rgba(16, 185, 129, 0.3); }
+.retry-photo-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.retry-photo-btn:active { background: rgba(99, 102, 241, 0.3); }
+.add-manually-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  background: transparent;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.add-manually-btn:hover { border-color: #6366f1; color: #818cf8; }
+
+/* ── Faculty Action Bar ──────────────────────────────────────────── */
+.faculty-action-bar {
+  position: sticky;
+  bottom: 0;
+  background: rgba(15, 17, 23, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+.confirm-submit-btn {
+  display: block;
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.35);
+  transition: transform 0.15s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+}
+.confirm-submit-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 3px 12px rgba(16, 185, 129, 0.25);
+}
+.confirm-submit-btn:disabled {
+  background: #374151;
+  box-shadow: none;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+/* ── Spinner Overlay ─────────────────────────────────────────────── */
+.spinner-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.spinner-overlay .spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(99, 102, 241, 0.2);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner-overlay .spinner-label {
+  color: #f1f5f9;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* ── Manual Add Student Sheet ────────────────────────────────────── */
+.manual-add-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 400;
+  display: flex;
+  align-items: flex-end;
+}
+.manual-add-sheet {
+  background: #1e293b;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 16px;
+  width: 100%;
+  max-height: 70dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+.manual-add-search {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #f1f5f9;
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.manual-add-results {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.manual-student-item {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.manual-student-item:active { background: rgba(99, 102, 241, 0.2); }

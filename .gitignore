@@ -46,6 +46,11 @@ Thumbs.db
 .vscode/
 *.iml
 
+# ── SQLite Database ───────────────────────────────────────────────────────────
+*.db
+*.db-wal
+*.db-shm
+
 # ── Pickle / Binary encodings ─────────────────────────────────────────────────
 *.pkl
 *.pickle

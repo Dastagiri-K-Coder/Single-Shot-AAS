@@ -102,6 +102,22 @@ def create_app() -> Flask:
     def _is_authenticated() -> bool:
         if app.config.get("TESTING"):
             return True
+        # --- v2.0: prefer local session token ---
+        token = request.cookies.get("aas_session")
+        if token:
+            try:
+                from aas.core.auth import validate_session
+                user = validate_session(token)
+                if user:
+                    # Sync into Flask session for backward-compat helpers
+                    session["user_id"]    = user["user_id"]
+                    session["user_email"] = user.get("email", "")
+                    session["user_name"]  = user.get("full_name", "")
+                    session["role"]       = user["role"]
+                    return True
+            except Exception:
+                pass
+        # --- Legacy: Google OAuth fallback ---
         try:
             from aas.integrations.google.oauth import is_authenticated
             return is_authenticated() and session.get("user_email")
@@ -205,12 +221,83 @@ def create_app() -> Flask:
     def splash():
         return render_template('splash.html')
 
-    @app.route('/login')
+    @app.route('/login', methods=['GET', 'POST'])
     def login():
+        # --- v2.0 Local Login (POST) ---
+        if request.method == 'POST':
+            uid = request.form.get('user_id', '').strip().upper()
+            pwd = request.form.get('password', '')
+            if not uid or not pwd:
+                return render_template('login.html', error='ID and password are required.')
+            try:
+                from aas.core.auth import (
+                    db_get_user, verify_password,
+                    db_increment_failed, db_reset_failed,
+                    create_session, log_audit
+                )
+                from aas.core.db import init_db, has_any_users
+                init_db()
+                if not has_any_users():
+                    return redirect('/setup/wizard')
+                user = db_get_user(uid)
+                if not user:
+                    return render_template('login.html', error='Invalid ID or Password.')
+                if not user['is_active']:
+                    return render_template('login.html', error='Account deactivated. Contact Admin.')
+                if user['is_locked']:
+                    return render_template('login.html', error='Account locked. Contact Admin.')
+                if not verify_password(pwd, user['password_hash']):
+                    db_increment_failed(uid)
+                    log_audit(uid, 'login_failed', 'Wrong password.', request.remote_addr)
+                    return render_template('login.html', error='Invalid ID or Password.')
+                # Successful login
+                db_reset_failed(uid)
+                token = create_session(uid, user['role'], request.remote_addr)
+                log_audit(uid, 'login', 'Successful login.', request.remote_addr)
+                session['user_id']    = uid
+                session['user_email'] = user.get('email', '')
+                session['user_name']  = user.get('full_name', '')
+                session['role']       = user['role']
+                resp = redirect('/dashboard' if _is_setup_complete() else '/setup')
+                resp.set_cookie('aas_session', token,
+                                httponly=True, samesite='Lax',
+                                max_age=8 * 3600)
+                if user.get('must_change_password'):
+                    resp = redirect('/change-password')
+                    resp.set_cookie('aas_session', token,
+                                    httponly=True, samesite='Lax',
+                                    max_age=8 * 3600)
+                return resp
+            except Exception as e:
+                traceback.print_exc()
+                return render_template('login.html', error=f'Login error: {e}'), 500
+
+        # --- GET: show login page ---
+        # If already authenticated redirect immediately
         if _is_authenticated():
             return redirect('/setup' if not _is_setup_complete() else '/dashboard')
         error = request.args.get('error')
         return render_template('login.html', error=error)
+
+    @app.route('/change-password', methods=['GET', 'POST'])
+    @login_required
+    def change_password():
+        if request.method == 'POST':
+            new_pwd  = request.form.get('new_password', '')
+            confirm  = request.form.get('confirm_password', '')
+            if not new_pwd or len(new_pwd) < 8:
+                return render_template('change_password.html',
+                                       error='Password must be at least 8 characters.')
+            if new_pwd != confirm:
+                return render_template('change_password.html',
+                                       error='Passwords do not match.')
+            try:
+                from aas.core.auth import db_set_password
+                db_set_password(session.get('user_id', ''), new_pwd, clear_force_change=True)
+                return redirect('/dashboard')
+            except Exception as e:
+                return render_template('change_password.html', error=str(e))
+        return render_template('change_password.html')
 
     @app.route('/auth/google')
     def auth_google():
@@ -269,10 +356,25 @@ def create_app() -> Flask:
 
     @app.route('/logout')
     def logout():
-        from aas.integrations.google.oauth import revoke_token
-        revoke_token()
+        # v2.0: delete local session token
+        token = request.cookies.get('aas_session')
+        if token:
+            try:
+                from aas.core.auth import delete_session, log_audit
+                log_audit(session.get('user_id'), 'logout', '', request.remote_addr)
+                delete_session(token)
+            except Exception:
+                pass
+        # Legacy: Google OAuth revoke
+        try:
+            from aas.integrations.google.oauth import revoke_token
+            revoke_token()
+        except Exception:
+            pass
         session.clear()
-        return redirect('/login')
+        resp = redirect('/login')
+        resp.delete_cookie('aas_session')
+        return resp
 
     @app.route('/api/auth/status')
     def auth_status():
@@ -432,9 +534,51 @@ def create_app() -> Flask:
     def dashboard():
         if not _is_setup_complete():
             return redirect('/setup')
-        return render_template('index.html',
-                               user_name=session.get('user_name', ''),
-                               user_email=session.get('user_email', ''))
+
+        from aas.core.roles import (
+            get_user_role, get_faculty_cameras,
+            get_faculty_cameras_by_id, get_current_period
+        )
+        # Determine role — prefer SQLite session, fall back to Google OAuth path
+        role    = session.get('role', '')
+        user_id = session.get('user_id', '')
+        email   = session.get('user_email', '')
+
+        if not role:
+            role = get_user_role(email) if email else 'faculty'
+
+        if role == 'faculty':
+            # Get cameras assigned to this faculty
+            if user_id:
+                cameras = get_faculty_cameras_by_id(user_id)
+            else:
+                cameras = get_faculty_cameras(email)
+            # Auto-detect current period for each camera
+            current_periods = {
+                cam['id']: get_current_period(cam['id'])
+                for cam in cameras
+            }
+            return render_template(
+                'index.html',
+                layout='faculty',
+                cameras=cameras,
+                current_periods=current_periods,
+                user_name=session.get('user_name', ''),
+                user_email=email,
+                user_id=user_id or '',
+            )
+        else:
+            from aas.capture.camera_registry import load_cameras
+            cameras = load_cameras()
+            return render_template(
+                'index.html',
+                layout='admin',
+                cameras=cameras,
+                current_periods={},
+                user_name=session.get('user_name', ''),
+                user_email=email,
+                user_id=user_id or '',
+            )
 
     # ══════════════════════════════════════════════════════════════════════════
     # System Status
@@ -461,6 +605,312 @@ def create_app() -> Flask:
             'authenticated':     _is_authenticated(),
             'setup_complete':    _is_setup_complete(),
         })
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # v2.0 — Faculty APIs (role-aware)
+    # ══════════════════════════════════════════════════════════════════════════
+
+    @app.route('/api/faculty/cameras', methods=['GET'])
+    @login_required
+    def faculty_cameras_api():
+        """Return cameras assigned to the logged-in faculty (or all for admin)."""
+        from aas.core.roles import get_faculty_cameras, get_faculty_cameras_by_id
+        from aas.capture.camera_registry import load_cameras
+        role    = session.get('role', 'faculty')
+        user_id = session.get('user_id', '')
+        email   = session.get('user_email', '')
+        if role == 'admin':
+            cameras = load_cameras()
+        elif user_id:
+            cameras = get_faculty_cameras_by_id(user_id)
+        else:
+            cameras = get_faculty_cameras(email)
+        return jsonify({'cameras': cameras, 'count': len(cameras)})
+
+    @app.route('/api/setup/assign-faculty', methods=['POST'])
+    @login_required
+    def assign_faculty():
+        """Admin: assign a faculty member (by email) to a camera/section."""
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        data = request.get_json(force=True) or {}
+        cam_id        = data.get('camera_id', '').strip()
+        faculty_email = data.get('faculty_email', '').strip()
+        faculty_name  = data.get('faculty_name', '').strip()
+        if not cam_id or not faculty_email:
+            return jsonify({'status': 'error', 'message': 'camera_id and faculty_email are required.'}), 400
+        from aas.capture.camera_registry import update_camera
+        cam = update_camera(cam_id,
+                            assigned_faculty_email=faculty_email,
+                            faculty_name=faculty_name)
+        if not cam:
+            return jsonify({'status': 'error', 'message': f'Camera {cam_id} not found.'}), 404
+        return jsonify({'status': 'success', 'camera': cam})
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # v2.0 — Timetable APIs
+    # ══════════════════════════════════════════════════════════════════════════
+
+    @app.route('/api/timetable/<camera_id>', methods=['GET'])
+    @login_required
+    def get_timetable(camera_id):
+        """Return current period + full schedule for a camera/section."""
+        from aas.core.roles import get_current_period, get_full_schedule
+        current = get_current_period(camera_id)
+        schedule = get_full_schedule(camera_id)
+        return jsonify({
+            'camera_id':      camera_id,
+            'current_period': current,
+            'schedule':       schedule,
+        })
+
+    @app.route('/api/timetable/<camera_id>', methods=['POST'])
+    @login_required
+    def save_timetable(camera_id):
+        """Admin: save/update timetable for a camera/section."""
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        data = request.get_json(force=True) or {}
+        schedule = data.get('schedule', [])
+        if not isinstance(schedule, list):
+            return jsonify({'status': 'error', 'message': 'schedule must be a list.'}), 400
+        try:
+            from aas.core.roles import save_schedule
+            save_schedule(camera_id, schedule)
+            return jsonify({'status': 'success', 'camera_id': camera_id, 'periods': len(schedule)})
+        except ValueError as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 400
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # v2.0 — Attendance Fallback APIs
+    # ══════════════════════════════════════════════════════════════════════════
+
+    # In-memory attendance session store: {session_token: {student_name: status}}
+    _attendance_sessions: dict = {}
+
+    def _get_attendance_session() -> dict:
+        """Return or create the per-session attendance state dict."""
+        token = request.cookies.get('aas_session', 'default')
+        if token not in _attendance_sessions:
+            _attendance_sessions[token] = {}
+        return _attendance_sessions[token]
+
+    @app.route('/api/attendance/override', methods=['POST'])
+    @login_required
+    def attendance_override():
+        """Level 1/3 Fallback: manually toggle a student's attendance status."""
+        data   = request.get_json(force=True) or {}
+        cam_id = data.get('camera_id', '').strip()
+        name   = data.get('name', '').strip()
+        status = data.get('status', '').strip().lower()
+        if not cam_id or not name or status not in ('present', 'absent'):
+            return jsonify({
+                'status': 'error',
+                'message': 'camera_id, name, and status (present|absent) are required.'
+            }), 400
+        att_state = _get_attendance_session()
+        att_state[name] = status
+        return jsonify({
+            'status':  'success',
+            'updated': f'{name} → {status}',
+            'name':    name,
+            'new_status': status,
+        })
+
+    @app.route('/take-attendance-individual', methods=['POST'])
+    @login_required
+    def take_attendance_individual():
+        """Level 2 Fallback: run recognition on a close-up photo of ONE student."""
+        cam_id      = request.form.get('camera_id', '').strip()
+        target_name = request.form.get('target_name', '').strip()
+        if not cam_id or not target_name:
+            return jsonify({'status': 'error',
+                            'message': 'camera_id and target_name are required.'}), 400
+        if 'photo' not in request.files:
+            return jsonify({'status': 'error', 'message': 'No photo file uploaded.'}), 400
+
+        photo_file = request.files['photo']
+        file_bytes = photo_file.read()
+        if not file_bytes:
+            return jsonify({'status': 'error', 'message': 'Uploaded photo is empty.'}), 400
+
+        try:
+            # Save uploaded photo via Mode D
+            from aas.capture.capture import capture_from_upload
+            img_path = capture_from_upload(file_bytes, camera_id=cam_id)
+
+            # Load ONLY the target student's encoding
+            from aas.capture.camera_registry import get_encodings_path
+            from aas.core.safe_pickle import safe_load as _sl
+            import os as _os
+            enc_path = get_encodings_path(cam_id)
+            if not enc_path:
+                enc_path = ENCODINGS_FOLDER
+
+            # Build single-student encoding set
+            safe_name = target_name.replace(' ', '_')
+            pkl_file  = _os.path.join(enc_path, f'{safe_name}.pkl')
+            if not _os.path.exists(pkl_file):
+                # Try root encodings folder
+                pkl_file = _os.path.join(ENCODINGS_FOLDER, f'{safe_name}.pkl')
+            if not _os.path.exists(pkl_file):
+                return jsonify({'status': 'error',
+                                'message': f'No encoding found for {target_name}.'}), 404
+
+            payload = _sl(pkl_file)
+            if isinstance(payload, dict):
+                target_encs = payload.get('encodings', [])
+            elif isinstance(payload, list):
+                target_encs = payload
+            else:
+                target_encs = []
+
+            if not target_encs:
+                return jsonify({'status': 'error',
+                                'message': f'No valid encodings for {target_name}.'}), 500
+
+            # Run face recognition against only this student
+            if not recognition.known_face_encodings:
+                recognition.load_facial_encodings_and_names_from_memory()
+
+            # Temporarily override encoding set for single-student comparison
+            orig_encs  = recognition.known_face_encodings[:]
+            orig_names = recognition.known_face_names[:]
+            recognition.known_face_encodings = target_encs
+            recognition.known_face_names     = [target_name] * len(target_encs)
+
+            try:
+                result = recognition.run_recognition(img_path)
+            finally:
+                recognition.known_face_encodings = orig_encs
+                recognition.known_face_names     = orig_names
+
+            matched = target_name in result.get('present', [])
+            new_status = 'present' if matched else 'absent'
+
+            # Auto-apply override if matched
+            if matched:
+                att_state = _get_attendance_session()
+                att_state[target_name] = 'present'
+
+            return jsonify({
+                'matched':  matched,
+                'name':     target_name,
+                'status':   new_status,
+            })
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # v2.0 — PWA Manifest + Service Worker
+    # ══════════════════════════════════════════════════════════════════════════
+
+    @app.route('/manifest.json')
+    def serve_manifest():
+        return send_from_directory(static_dir, 'manifest.json',
+                                   mimetype='application/manifest+json')
+
+    @app.route('/sw.js')
+    def serve_sw():
+        return send_from_directory(static_dir, 'sw.js',
+                                   mimetype='application/javascript')
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # v2.0 — Admin User Management APIs
+    # ══════════════════════════════════════════════════════════════════════════
+
+    @app.route('/admin/users', methods=['GET'])
+    @login_required
+    def admin_users():
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        from aas.core.auth import get_all_users
+        users = get_all_users()
+        return render_template('user_management.html', users=users)
+
+    @app.route('/api/admin/users', methods=['GET'])
+    @login_required
+    def api_list_users():
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        from aas.core.auth import get_all_users
+        return jsonify({'users': get_all_users()})
+
+    @app.route('/api/admin/users/create', methods=['POST'])
+    @login_required
+    def api_create_user():
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        data = request.get_json(force=True) or {}
+        required = ['user_id', 'full_name', 'role', 'password']
+        for f in required:
+            if not data.get(f):
+                return jsonify({'status': 'error', 'message': f'{f} is required.'}), 400
+        try:
+            from aas.core.auth import db_create_user
+            user = db_create_user(
+                user_id          = data['user_id'],
+                full_name        = data['full_name'],
+                role             = data['role'],
+                plain_password   = data['password'],
+                email            = data.get('email', ''),
+                assigned_cameras = data.get('assigned_cameras', []),
+                created_by       = session.get('user_id', 'admin'),
+                must_change_password = data.get('must_change_password', True),
+            )
+            uid = user.get('user_id', data['user_id']) if isinstance(user, dict) else data['user_id']
+            return jsonify({'status': 'success', 'user': user, 'user_id': uid})
+        except ValueError as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 400
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    @app.route('/api/admin/users/<user_id>/reset-password', methods=['POST'])
+    @login_required
+    def api_reset_password(user_id):
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        data = request.get_json(force=True) or {}
+        new_pwd = data.get('password', '')
+        if not new_pwd or len(new_pwd) < 8:
+            return jsonify({'status': 'error', 'message': 'Password must be ≥ 8 chars.'}), 400
+        from aas.core.auth import db_set_password
+        db_set_password(user_id, new_pwd, clear_force_change=False)
+        return jsonify({'status': 'success', 'message': f'Password reset for {user_id}.'})
+
+    @app.route('/api/admin/users/<user_id>/unlock', methods=['POST'])
+    @login_required
+    def api_unlock_user(user_id):
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        from aas.core.auth import unlock_user
+        unlock_user(user_id, unlocked_by=session.get('user_id', 'admin'))
+        return jsonify({'status': 'success', 'message': f'{user_id} unlocked.'})
+
+    @app.route('/api/admin/users/<user_id>/deactivate', methods=['POST'])
+    @login_required
+    def api_deactivate_user(user_id):
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        if user_id == session.get('user_id'):
+            return jsonify({'status': 'error', 'message': 'Cannot deactivate yourself.'}), 400
+        from aas.core.auth import deactivate_user
+        deactivate_user(user_id, deactivated_by=session.get('user_id', 'admin'))
+        return jsonify({'status': 'success', 'message': f'{user_id} deactivated.'})
+
+
+    @app.route('/api/admin/next-faculty-id', methods=['GET'])
+    @login_required
+    def api_next_faculty_id():
+        """Return the next auto-suggested faculty ID."""
+        if session.get('role') != 'admin':
+            return jsonify({'status': 'error', 'message': 'Admin only.'}), 403
+        from aas.core.roles import get_next_faculty_id
+        return jsonify({'status': 'ok', 'next_id': get_next_faculty_id()})
+
 
     # ══════════════════════════════════════════════════════════════════════════
     # Camera Management
@@ -553,10 +1003,11 @@ def create_app() -> Flask:
 
     @app.route('/api/enroll/upload', methods=['POST'])
     def enroll_upload():
-        name   = request.form.get('name', '').strip().replace(' ', '_')
-        email  = request.form.get('email', '').strip()
-        gender = request.form.get('gender', 'M').strip().upper() or 'M'
-        cam_id = request.form.get('camera_id', '')
+        name        = request.form.get('name', '').strip().replace(' ', '_')
+        email       = request.form.get('email', '').strip()
+        gender      = request.form.get('gender', 'M').strip().upper() or 'M'
+        cam_id      = request.form.get('camera_id', '')
+        roll_number = request.form.get('roll_number', '').strip()  # B1
 
         if not name:
             return jsonify({'status': 'error', 'message': 'Student name is required'}), 400
@@ -641,14 +1092,15 @@ def create_app() -> Flask:
 
     @app.route('/api/enroll/webcam', methods=['POST'])
     def enroll_webcam():
-        data     = request.get_json(force=True)
-        name     = data.get('name', '').strip().replace(' ', '_')
-        angle    = data.get('angle', 'front').lower()
-        img_b64  = data.get('image', '')
-        email    = data.get('email', '').strip()
-        gender   = data.get('gender', 'M').upper()
-        finalize = data.get('finalize', False)
-        cam_id   = data.get('camera_id', '')
+        data        = request.get_json(force=True)
+        name        = data.get('name', '').strip().replace(' ', '_')
+        angle       = data.get('angle', 'front').lower()
+        img_b64     = data.get('image', '')
+        email       = data.get('email', '').strip()
+        gender      = data.get('gender', 'M').upper()
+        finalize    = data.get('finalize', False)
+        cam_id      = data.get('camera_id', '')
+        roll_number = data.get('roll_number', '').strip()  # B1
 
         if not name:
             return jsonify({'status': 'error', 'message': 'Student name required'}), 400
@@ -729,8 +1181,10 @@ def create_app() -> Flask:
     @app.route('/take-attendance', methods=['POST'])
     def take_attendance():
         try:
-            data   = request.get_json(force=True) or {}
-            cam_id = data.get('camera_id', '')
+            data    = request.get_json(force=True) or {}
+            cam_id  = data.get('camera_id', '')
+            subject = data.get('subject', '')   # B4
+            period  = int(data.get('period', 0))  # B4
 
             if not recognition.known_face_encodings:
                 recognition.load_facial_encodings_and_names_from_memory()
@@ -788,18 +1242,21 @@ def create_app() -> Flask:
                 print(f"  [TTS] Announcement skipped: {e}")
 
             return jsonify({
-                'status':        'success',
-                'camera_id':     cam_id,
-                'present':       result['present'],
-                'boys_count':    boys_count,
-                'girls_count':   girls_count,
-                'unknown_count': result['unknown_count'],
-                'total_faces':   result['total_faces'],
-                'total_class':   total_class,
-                'timestamp':     datetime.datetime.now().strftime('%I:%M %p, %d %b %Y'),
-                'annotated_img': annotated_url,
-                'sheet_synced':  sheet_synced,
-                'sheet_msg':     sheet_msg,
+                'status':          'success',
+                'camera_id':       cam_id,
+                'present':         result['present'],
+                'absent_students': [{'name': n} for n in result.get('absent', [])],  # B4
+                'boys_count':      boys_count,
+                'girls_count':     girls_count,
+                'unknown_count':   result['unknown_count'],
+                'total_faces':     result['total_faces'],
+                'total_class':     total_class,
+                'subject':         subject,
+                'period':          period,
+                'timestamp':       datetime.datetime.now().strftime('%I:%M %p, %d %b %Y'),
+                'annotated_img':   annotated_url,
+                'sheet_synced':    sheet_synced,
+                'sheet_msg':       sheet_msg,
             })
         except Exception as e:
             traceback.print_exc()
@@ -1004,4 +1461,297 @@ def create_app() -> Flask:
             'message': f"Settings saved: {', '.join(updated.keys())}. Restart to apply.",
         })
 
+    # ── E1: Camera Lock ────────────────────────────────────────────────────
+    _camera_locks: dict = {}  # cam_id → faculty_email
+
+    @app.route('/api/camera/<cam_id>/lock-status', methods=['GET'])
+    @login_required
+    def camera_lock_status(cam_id):
+        busy = cam_id in _camera_locks
+        return jsonify({'busy': busy, 'held_by': _camera_locks.get(cam_id)})
+
+    # ── B5: Attendance Finalize ────────────────────────────────────────────
+    @app.route('/api/attendance/finalize', methods=['POST'])
+    @login_required
+    def finalize_attendance():
+        """B5: Faculty confirm & submit — writes to weekly Google Sheet."""
+        try:
+            data    = request.get_json(force=True) or {}
+            cam_id  = data.get('camera_id', '')
+            subject = data.get('subject', '')
+            period  = int(data.get('period', 0))
+            _camera_locks.pop(cam_id, None)  # release lock E1
+
+            creds = _get_creds()
+            if not creds:
+                return jsonify({'ok': True, 'note': 'No Google creds — sheet not written'})
+
+            from aas.capture.camera_registry import get_camera, load_cameras, save_cameras
+            from aas.attendance.spreadsheet import (
+                create_weekly_sheet, write_attendance_event, _get_gspread_client
+            )
+            import datetime as _dt
+
+            cam            = get_camera(cam_id) if cam_id else {}
+            spreadsheet_id = (cam or {}).get('sheet_id', '')
+            if not spreadsheet_id:
+                return jsonify({'ok': True, 'note': 'No sheet_id for camera'})
+
+            gc         = _get_gspread_client(creds)
+            now        = _dt.datetime.now()
+            week_num   = now.isocalendar()[1]
+            year_2     = now.strftime('%y')
+            week_key   = f"sheet_week_{year_2}_{week_num:02d}"
+            week_label = f"Week {week_num} {now.year}"
+            section    = (cam or {}).get('sheet_name', 'Section')
+
+            students_raw = (cam or {}).get('enrolled_students', [])
+            students = [
+                {'name': s.get('name', s) if isinstance(s, dict) else s,
+                 'roll_number': s.get('roll_number', '') if isinstance(s, dict) else ''}
+                for s in students_raw
+            ]
+
+            if cam and week_key not in cam:
+                create_weekly_sheet(gc, spreadsheet_id, section, week_label, students)
+                cam[week_key] = week_label
+                all_cameras = load_cameras()
+                for i, c in enumerate(all_cameras):
+                    if c.get('id') == cam_id:
+                        all_cameras[i] = cam
+                        break
+                save_cameras(all_cameras)
+
+            tab_name     = (cam or {}).get(week_key, week_label)
+            student_rows = [
+                {'name': s['name'], 'roll_number': s.get('roll_number', ''), 'row_index': 9 + i}
+                for i, s in enumerate(students)
+            ]
+            present_names = set(session.get('last_present', []))
+            day_of_week   = min(now.weekday(), 5)
+
+            write_attendance_event(
+                gc, spreadsheet_id, tab_name,
+                student_rows, present_names, day_of_week, period
+            )
+
+            try:
+                from aas.notifications.emailing import send_faculty_summary
+                import threading
+                threading.Thread(
+                    target=send_faculty_summary,
+                    args=(session.get('user_email', ''), section,
+                          len(present_names), len(students)),
+                    daemon=True
+                ).start()
+            except Exception:
+                pass
+
+            return jsonify({'ok': True})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'ok': False, 'error': str(e)}), 500
+
+    # ── C1: Setup Finalize ─────────────────────────────────────────────────
+    @app.route('/setup/finalize', methods=['POST'])
+    def setup_finalize():
+        """C1: Create first admin user and mark setup complete (C3)."""
+        if _is_setup_complete():
+            return jsonify({'error': 'Already configured'}), 409
+        try:
+            data           = request.get_json(force=True) or {}
+            admin_email    = (data.get('admin_email') or '').strip()
+            admin_password = (data.get('admin_password') or '').strip()
+            if not admin_email or not admin_password:
+                return jsonify({'error': 'Email and password required'}), 400
+            if len(admin_password) < 8:
+                return jsonify({'error': 'Password must be at least 8 characters'}), 400
+            from aas.core.auth import create_user
+            create_user(email=admin_email, password=admin_password,
+                        role='admin', must_change_password=False)
+            inst = _load_institution()
+            inst['setup_complete'] = True
+            _save_institution(inst)
+            return jsonify({'ok': True, 'redirect': '/login'})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+
+    # ── D1: Section Summary ────────────────────────────────────────────────
+    @app.route('/api/reports/<cam_id>/summary', methods=['GET'])
+    @login_required
+    def get_attendance_summary(cam_id):
+        try:
+            from aas.capture.camera_registry import get_camera
+            from aas.attendance.spreadsheet import get_section_summary, _get_gspread_client
+            cam = get_camera(cam_id)
+            if not cam:
+                return jsonify({'error': 'Camera not found'}), 404
+            creds = _get_creds()
+            if not creds:
+                return jsonify({'error': 'No Google credentials'}), 503
+            gc        = _get_gspread_client(creds)
+            threshold = float(request.args.get('threshold', 0.75))
+            summary   = get_section_summary(gc, cam.get('sheet_id', ''), threshold)
+            return jsonify({'ok': True, 'data': summary, 'count': len(summary)})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+
+    # ── D2: Student Report ─────────────────────────────────────────────────
+    @app.route('/api/reports/<cam_id>/student/<student_name>', methods=['GET'])
+    @login_required
+    def get_student_report(cam_id, student_name):
+        try:
+            from aas.capture.camera_registry import get_camera
+            from aas.attendance.spreadsheet import get_student_summary, _get_gspread_client
+            cam = get_camera(cam_id)
+            if not cam:
+                return jsonify({'error': 'Camera not found'}), 404
+            creds = _get_creds()
+            if not creds:
+                return jsonify({'error': 'No Google credentials'}), 503
+            gc        = _get_gspread_client(creds)
+            threshold = float(request.args.get('threshold', 0.75))
+            data      = get_student_summary(gc, cam.get('sheet_id', ''), student_name, threshold)
+            return jsonify({'ok': True, 'data': data})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+
+    # ── D3: Defaulters ────────────────────────────────────────────────────
+    @app.route('/api/reports/<cam_id>/defaulters', methods=['GET'])
+    @login_required
+    def get_defaulters(cam_id):
+        try:
+            from aas.capture.camera_registry import get_camera
+            from aas.attendance.spreadsheet import get_section_summary, _get_gspread_client
+            cam = get_camera(cam_id)
+            if not cam:
+                return jsonify({'error': 'Camera not found'}), 404
+            creds = _get_creds()
+            if not creds:
+                return jsonify({'error': 'No Google credentials'}), 503
+            gc        = _get_gspread_client(creds)
+            threshold = float(request.args.get('threshold', 0.75))
+            summary   = get_section_summary(gc, cam.get('sheet_id', ''), threshold)
+            defaulters = [s for s in summary if s['percentage'] < threshold * 100]
+            return jsonify({'ok': True, 'data': defaulters, 'count': len(defaulters)})
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+
+    # ── D4: CSV Export ────────────────────────────────────────────────────
+    @app.route('/api/reports/<cam_id>/export/csv', methods=['GET'])
+    @login_required
+    def export_attendance_csv(cam_id):
+        try:
+            import csv, io
+            from flask import Response
+            from aas.capture.camera_registry import get_camera
+            from aas.attendance.spreadsheet import get_section_summary, _get_gspread_client
+            cam = get_camera(cam_id)
+            if not cam:
+                return jsonify({'error': 'Camera not found'}), 404
+            creds = _get_creds()
+            if not creds:
+                return jsonify({'error': 'No Google credentials'}), 503
+            gc      = _get_gspread_client(creds)
+            summary = get_section_summary(gc, cam.get('sheet_id', ''))
+            output  = io.StringIO()
+            writer  = csv.DictWriter(
+                output,
+                fieldnames=['name','roll_number','attended','total_classes','percentage','eligible'],
+                extrasaction='ignore'
+            )
+            writer.writeheader()
+            writer.writerows(summary)
+            return Response(
+                output.getvalue(),
+                mimetype='text/csv',
+                headers={'Content-Disposition': f'attachment;filename={cam_id}_attendance.csv'}
+            )
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+
+    # ── D5: PDF Export ────────────────────────────────────────────────────
+    @app.route('/api/reports/<cam_id>/export/pdf', methods=['GET'])
+    @login_required
+    def export_attendance_pdf(cam_id):
+        try:
+            import io
+            from flask import Response
+            from aas.capture.camera_registry import get_camera
+            from aas.attendance.spreadsheet import get_section_summary, _get_gspread_client
+            try:
+                from reportlab.lib.pagesizes import A4
+                from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+                from reportlab.lib import colors
+                from reportlab.lib.styles import getSampleStyleSheet
+            except ImportError:
+                return jsonify({'error': 'reportlab not installed. pip install reportlab'}), 503
+            cam = get_camera(cam_id)
+            if not cam:
+                return jsonify({'error': 'Camera not found'}), 404
+            creds = _get_creds()
+            if not creds:
+                return jsonify({'error': 'No Google credentials'}), 503
+            gc      = _get_gspread_client(creds)
+            summary = get_section_summary(gc, cam.get('sheet_id', ''))
+            buf     = io.BytesIO()
+            doc     = SimpleDocTemplate(buf, pagesize=A4)
+            styles  = getSampleStyleSheet()
+            elems   = [Paragraph(f"Attendance Report — {cam_id}", styles['Title'])]
+            tdata   = [['Name','Roll No','Attended','Total','%','Eligible']]
+            for s in summary:
+                tdata.append([s['name'], s['roll_number'], str(s['attended']),
+                               str(s['total_classes']), f"{s['percentage']}%",
+                               'Yes' if s['eligible'] else 'No'])
+            t = Table(tdata)
+            t.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(-1,0), colors.HexColor('#1e293b')),
+                ('TEXTCOLOR', (0,0),(-1,0), colors.white),
+                ('FONTNAME',  (0,0),(-1,0), 'Helvetica-Bold'),
+                ('GRID',      (0,0),(-1,-1), 0.5, colors.grey),
+            ]))
+            elems.append(t)
+            doc.build(elems)
+            return Response(
+                buf.getvalue(),
+                mimetype='application/pdf',
+                headers={'Content-Disposition': f'attachment;filename={cam_id}_attendance.pdf'}
+            )
+        except Exception as e:
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+
+    # ── v2.5 Blueprint Registration ───────────────────────────────────────────
+    try:
+        from aas.web.routes.attendance import attendance_v2_bp
+        from aas.web.routes.cameras import cameras_v2_bp
+        from aas.web.routes.sync_routes import sync_v2_bp, system_v2_bp
+
+        app.register_blueprint(attendance_v2_bp)
+        app.register_blueprint(cameras_v2_bp)
+        app.register_blueprint(sync_v2_bp)
+        app.register_blueprint(system_v2_bp)
+        print("  ✓ [v2.5] API blueprints registered (/api/v2/)")
+    except Exception as _bp_err:
+        print(f"  [WARN] v2.5 blueprint registration failed: {_bp_err}")
+
+    # ── v2.5 Sync Worker — start background outbox processor ─────────────────
+    if not app.config.get("TESTING"):
+        try:
+            from aas.sync.worker import start_sync_worker
+            start_sync_worker()
+            print("  ✓ [v2.5] Sync worker started.")
+        except Exception as _sw_err:
+            print(f"  [WARN] Sync worker failed to start: {_sw_err}")
+
     return app
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NOTE: Routes above registered inside create_app() — do not add module-level routes.
+# ══════════════════════════════════════════════════════════════════════════════

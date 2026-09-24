@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Single Shot AAS — User Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #090d12; --card: #0f1521; --card2: #141c2b; --border: rgba(255,255,255,0.07);
+      --accent: #4f8ef7; --accent2: #7c3aed; --green: #10b981; --teal: #06b6d4;
+      --red: #ef4444; --amber: #f59e0b; --text: #e2e8f0; --muted: #94a3b8; --dim: #475569;
+    }
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 70% 50% at 10% 5%,  rgba(79,142,247,0.10) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 70% at 88% 90%, rgba(124,58,237,0.08) 0%, transparent 55%);
+      font-family: 'Inter', -apple-system, sans-serif;
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(79,142,247,0.25); border-radius: 99px; }
+
+    /* ── Layout ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+
+    /* ── Header ── */
+    .page-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap;
+    }
+    .page-header-left {}
+    .page-title {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.5rem; font-weight: 800;
+      background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .page-title-icon {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; flex-shrink: 0;
+      -webkit-text-fill-color: initial; color: #fff;
+    }
+    .page-subtitle { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+    .page-header-right { display: flex; gap: 0.75rem; align-items: center; }
+    .nav-back {
+      font-size: 0.78rem; color: var(--muted); text-decoration: none;
+      padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.07);
+      transition: all 0.2s;
+    }
+    .nav-back:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+
+    /* ── Stat Cards ── */
+    .stat-row {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem; margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 16px;
+    }
+    .stat-num { font-size: 1.8rem; font-weight: 800; line-height: 1; color: var(--accent); }
+    .stat-num.green { color: var(--green); }
+    .stat-num.red   { color: var(--red); }
+    .stat-num.amber { color: var(--amber); }
+    .stat-lbl { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      display: flex; gap: 4px;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 12px; padding: 4px; margin-bottom: 1.25rem;
+      width: fit-content;
+    }
+    .tab-btn {
+      padding: 7px 16px; border-radius: 9px; border: none; font-family: inherit;
+      font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--muted);
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: rgba(79,142,247,0.15); color: #7ab3ff;
+      border: 1px solid rgba(79,142,247,0.25);
+    }
+
+    /* ── Search ── */
+    .toolbar {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 1rem; flex-wrap: wrap;
+    }
+    .search-box {
+      flex: 1; min-width: 180px; max-width: 300px;
+      padding: 8px 12px; border-radius: 8px;
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      color: var(--text); font-family: inherit; font-size: 0.82rem; outline: none;
+      transition: border 0.2s;
+    }
+    .search-box:focus { border-color: var(--accent); }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 0.55rem 1.1rem; border-radius: 8px; border: none;
+      font-family: inherit; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .btn-danger  { background: rgba(239,68,68,.12); color: var(--red);   border: 1px solid rgba(239,68,68,.25); }
+    .btn-success { background: rgba(16,185,129,.12); color: var(--green); border: 1px solid rgba(16,185,129,.25); }
+    .btn-muted   { background: rgba(255,255,255,.05); color: var(--muted); border: 1px solid var(--border); }
+    .btn-sm { padding: 0.38rem 0.75rem; font-size: 0.72rem; }
+
+    /* ── Table Card ── */
+    .table-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th {
+      padding: 0.75rem 1rem; text-align: left;
+      color: var(--muted); font-weight: 600; font-size: 0.68rem;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.015); }
+
+    /* ── User Cell ── */
+    .user-cell { display: flex; align-items: center; gap: 10px; }
+    .user-avatar {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; font-weight: 700; color: #fff;
+    }
+    .user-avatar.admin   { background: linear-gradient(135deg, #d4a017, #b45309); }
+    .user-avatar.faculty { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+    .user-info .un  { font-weight: 600; color: var(--text); }
+    .user-info .uid {
+      font-size: 0.7rem; color: var(--accent); font-family: monospace;
+      background: rgba(79,142,247,0.08); padding: 1px 6px; border-radius: 4px;
+      display: inline-block; margin-top: 1px;
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 9px; border-radius: 20px; font-size: 0.68rem; font-weight: 700;
+    }
+    .badge-admin   { background: rgba(212,160,23,.15); color: #d4a017; border: 1px solid rgba(212,160,23,.25); }
+    .badge-faculty { background: rgba(79,142,247,.12); color: #7ab3ff;  border: 1px solid rgba(79,142,247,.2); }
+    .badge-active  { background: rgba(16,185,129,.12); color: #10b981;  border: 1px solid rgba(16,185,129,.25); }
+    .badge-locked  { background: rgba(239,68,68,.12);  color: #f87171;  border: 1px solid rgba(239,68,68,.25); }
+    .badge-inactive{ background: rgba(148,163,184,.08); color: var(--muted); border: 1px solid var(--border); }
+
+    /* ── Camera chips ── */
+    .cam-chip {
+      display: inline-block; padding: 2px 8px; border-radius: 5px;
+      font-size: 0.65rem; font-weight: 600;
+      background: rgba(6,182,212,0.1); color: #06b6d4;
+      border: 1px solid rgba(6,182,212,0.2); margin: 1px;
+    }
+
+    .actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+    /* ── Flash messages ── */
+    .flash {
+      padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; margin-bottom: 1rem;
+      background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); color: #fca5a5;
+    }
+    .flash.ok { background: rgba(16,185,129,.1); border-color: rgba(16,185,129,.25); color: #6ee7b7; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center; padding: 3rem; color: var(--muted);
+    }
+    .empty-state .es-icon { font-size: 2.5rem; margin-bottom: 0.75rem; display: block; }
+    .empty-state p { margin-bottom: 1rem; }
+
+    /* ── Modal Overlay ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    /* ── Create Modal ── */
+    .modal-box {
+      background: #0f1521; border: 1px solid rgba(79,142,247,0.2);
+      border-radius: 18px; padding: 28px; width: min(520px, 94vw);
+      display: flex; flex-direction: column; gap: 16px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      max-height: 92vh; overflow-y: auto;
+    }
+    .modal-box h2 { font-size: 1rem; font-weight: 700; }
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+    .form-group input,
+    .form-group select {
+      padding: 0.65rem 0.9rem;
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.85rem; outline: none;
+      transition: border 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--accent); }
+    .form-group select option { background: #0f1521; }
+    .form-group .hint { font-size: 0.68rem; color: var(--dim); }
+
+    /* ── Credentials Box ── */
+    .cred-box {
+      background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.22);
+      border-radius: 12px; padding: 16px;
+      display: none; flex-direction: column; gap: 10px;
+    }
+    .cred-box.visible { display: flex; }
+    .cred-box-title { font-size: 0.8rem; font-weight: 700; color: #10b981; }
+    .cred-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .cred-label { font-size: 0.72rem; color: var(--muted); }
+    .cred-val {
+      font-family: monospace; font-size: 0.88rem; color: #34d399;
+      background: rgba(0,0,0,0.3); padding: 4px 12px; border-radius: 7px;
+      cursor: pointer; user-select: all;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.15s;
+    }
+    .cred-val:hover { background: rgba(0,0,0,0.5); }
+    .cred-note { font-size: 0.68rem; color: var(--dim); margin-top: 2px; }
+
+    .modal-btns { display: flex; gap: 10px; }
+
+    /* ── Modal Flash ── */
+    .modal-flash {
+      padding: 8px 12px; border-radius: 8px; font-size: 0.78rem;
+      display: none;
+    }
+    .modal-flash.error   { display: block; background: rgba(239,68,68,.1);   border: 1px solid rgba(239,68,68,.25);   color: #fca5a5; }
+    .modal-flash.success { display: block; background: rgba(16,185,129,.1);  border: 1px solid rgba(16,185,129,.22);  color: #6ee7b7; }
+
+    /* ── Toast ── */
+    #toastBox {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 300;
+      display: flex; flex-direction: column; gap: 8px; max-width: 300px;
+    }
+    .toast-item {
+      background: #131c2e; border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 14px; font-size: 0.82rem; color: var(--text);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      animation: slideIn 0.25s ease;
+    }
+    .toast-item.ok    { border-color: rgba(16,185,129,0.3); color: #6ee7b7; }
+    .toast-item.error { border-color: rgba(239,68,68,0.3);  color: #fca5a5; }
+    @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:none; } }
+
+    /* ── Tab panels ── */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .modal-grid { grid-template-columns: 1fr; }
+      .form-group.full { grid-column: auto; }
+      .stat-row { grid-template-columns: 1fr 1fr; }
+      th:nth-child(4), td:nth-child(4),
+      th:nth-child(6), td:nth-child(6) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-title">
+          <div class="page-title-icon">👥</div>
+          User Management
+        </div>
+        <div class="page-subtitle">Faculty &amp; Admin accounts — Single Shot AAS v2.0</div>
+      </div>
+      <div class="page-header-right">
+        <a href="/dashboard" class="nav-back">← Dashboard</a>
+        <button class="btn btn-primary" onclick="openCreateModal()">+ Add User</button>
+      </div>
+    </div>
+
+    <!-- Flash Message -->
+    {% if flash %}
+    <div class="flash {% if flash_ok %}ok{% endif %}" style="margin-bottom:1.25rem;">{{ flash }}</div>
+    {% endif %}
+
+    <!-- Stats Row -->
+    <div class="stat-row" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-num" id="st-total">{{ users|length }}</div>
+        <div class="stat-lbl">Total Users</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num green" id="st-faculty">{{ users|selectattr('role','equalto','faculty')|list|length }}</div>
+        <div class="stat-lbl">Faculty</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num amber" id="st-admin">{{ users|selectattr('role','equalto','admin')|list|length }}</div>
+        <div class="stat-lbl">Admins</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num red" id="st-locked">{{ users|selectattr('is_locked')|list|length }}</div>
+        <div class="stat-lbl">Locked</div>
+      </div>
+    </div>
+
+    <!-- Filter Tabs + Toolbar -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tabAll"     onclick="setTab('all')">All Users</button>
+      <button class="tab-btn"        id="tabFaculty" onclick="setTab('faculty')">Faculty</button>
+      <button class="tab-btn"        id="tabAdmin"   onclick="setTab('admin')">Admin</button>
+    </div>
+
+    <div class="toolbar">
+      <input class="search-box" id="userSearch" placeholder="🔍 Search by name, ID or email..." oninput="filterUsers()"/>
+    </div>
+
+    <!-- Users Table -->
+    <div class="table-card">
+      <table id="userTable">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Cameras</th>
+            <th>Last Login</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody">
+          {% for u in users %}
+          <tr class="user-row" data-role="{{ u.role }}" data-name="{{ u.full_name|lower }}" data-id="{{ u.user_id|lower }}" data-email="{{ (u.email or '')|lower }}">
+            <td>
+              <div class="user-cell">
+                <div class="user-avatar {{ u.role }}">{{ u.full_name[0]|upper }}</div>
+                <div class="user-info">
+                  <div class="un">{{ u.full_name }}</div>
+                  <code class="uid">{{ u.user_id }}</code>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge {% if u.role == 'admin' %}badge-admin{% else %}badge-faculty{% endif %}">
+                {% if u.role == 'admin' %}★{% else %}●{% endif %} {{ u.role|capitalize }}
+              </span>
+            </td>
+            <td style="color:var(--muted);font-size:.78rem;">{{ u.email or '—' }}</td>
+            <td>
+              {% if u.is_locked %}
+                <span class="badge badge-locked">🔒 Locked</span>
+              {% elif u.is_active %}
+                <span class="badge badge-active">● Active</span>
+              {% else %}
+                <span class="badge badge-inactive">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              {% set cams_raw = u.assigned_cameras | default('[]') %}
+              {% if cams_raw and cams_raw != '[]' %}
+                {% set ns = namespace(found=false) %}
+                <span id="cams_{{ u.user_id }}" class="cams-cell" data-cams="{{ cams_raw | e }}"></span>
+                <script>
+                  (function(){
+                    var el = document.getElementById('cams_{{ u.user_id }}');
+                    try {
+                      var cams = JSON.parse(el.dataset.cams);
+                      el.innerHTML = cams.map(function(c){ return '<span class="cam-chip">'+c+'</span>'; }).join('');
+                    } catch(e) { el.textContent = '—'; }
+                  })();
+                </script>
+              {% else %}
+                <span style="color:var(--dim);font-size:.72rem;">—</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--muted);font-size:.72rem;">
+              {{ u.last_login[:16].replace('T',' ') if u.last_login else 'Never' }}
+            </td>
+            <td>
+              <div class="actions">
+                {% if u.is_locked %}
+                <button class="btn btn-sm btn-success" onclick="unlockUser('{{ u.user_id }}')">🔓 Unlock</button>
+                {% endif %}
+                {% if u.is_active %}
+                <button class="btn btn-sm btn-danger" onclick="deactivateUser('{{ u.user_id }}', '{{ u.full_name }}')">Deactivate</button>
+                {% endif %}
+                <button class="btn btn-sm btn-muted" onclick="openResetModal('{{ u.user_id }}', '{{ u.full_name }}')">🔑 Reset Pwd</button>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7">
+              <div class="empty-state">
+                <span class="es-icon">👥</span>
+                <p>No users found.</p>
+                <button class="btn btn-primary" onclick="openCreateModal()">+ Add First User</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /.page -->
+
+
+  <!-- ══ CREATE USER MODAL ══════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="createModal">
+    <div class="modal-box">
+      <h2>➕ Create New User</h2>
+      <div class="modal-flash" id="createFlash"></div>
+
+      <div class="modal-grid">
+        <div class="form-group full">
+          <label for="cu_name">Full Name *</label>
+          <input type="text" id="cu_name" placeholder="Dr. Jane Smith"/>
+        </div>
+        <div class="form-group">
+          <label for="cu_id">Employee / Faculty ID *</label>
+          <input type="text" id="cu_id" placeholder="e.g. FAC-001"/>
+          <span class="hint">Use FAC-### for faculty, ADM-### for admin</span>
+        </div>
+        <div class="form-group">
+          <label for="cu_role">Role *</label>
+          <select id="cu_role">
+            <option value="faculty">Faculty</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label for="cu_email">Email Address (optional)</label>
+          <input type="email" id="cu_email" placeholder="email@institution.edu"/>
+        </div>
+        <div class="form-group">
+          <label for="cu_dept">Department / Subject</label>
+          <input type="text" id="cu_dept" placeholder="e.g. Computer Science"/>
+        </div>
+        <div class="form-group">
+          <label for="cu_camera">Assign Camera / Section</label>
+          <select id="cu_camera">
+            <option value="">— None assigned yet —</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label for="cu_pwd">Temporary Password * (min 8 chars)</label>
+          <input type="password" id="cu_pwd" placeholder="••••••••"/>
+          <span class="hint">User must change password on first login</span>
+        </div>
+      </div>
+
+      <!-- Credentials revealed after creation -->
+      <div class="cred-box" id="createCredBox">
+        <div class="cred-box-title">✅ Account Created — Share These Credentials</div>
+        <div class="cred-row">
+          <span class="cred-label">Login ID:</span>
+          <span class="cred-val" id="newCredId" onclick="copyVal(this)" title="Click to copy">— <span style="font-size:.65rem;opacity:.5">📋</span></span>
+        </div>
+        <div class="cred-row">
+          <span class="cred-label">Temp Password:</span>
+          <span class="cred-val" id="newCredPwd" onclick="copyVal(this)" title="Click to copy">— <span style="font-size:.65rem;opacity:.5">📋</span></span>
+        </div>
+        <div class="cred-note">Faculty must change password upon first login. Click any value to copy.</div>
+      </div>
+
+      <div class="modal-btns">
+        <button class="btn btn-primary" style="flex:1" id="btnCreate" onclick="createUser()">Create User</button>
+        <button class="btn btn-muted" style="flex:1" onclick="closeCreateModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RESET PASSWORD MODAL ═══════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="resetModal">
+    <div class="modal-box" style="max-width:380px;">
+      <h2>🔑 Reset Password</h2>
+      <p style="font-size:0.78rem;color:var(--muted);" id="resetFor">For: —</p>
+      <div class="modal-flash" id="resetFlash"></div>
+      <div class="form-group">
+        <label for="resetPwd">New Password (min 8 chars)</label>
+        <input type="password" id="resetPwd" placeholder="New password"/>
+      </div>
+      <div class="modal-btns" style="margin-top:4px;">
+        <button class="btn btn-primary" style="flex:1" onclick="doResetPwd()">Reset Password</button>
+        <button class="btn btn-muted" style="flex:1" onclick="closeResetModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastBox"></div>
+
+  <script>
+    // ── Toast ──────────────────────────────────────────────────────────────
+    function showToast(msg, ok = true) {
+      const box = document.getElementById('toastBox');
+      const t = document.createElement('div');
+      t.className = `toast-item ${ok ? 'ok' : 'error'}`;
+      t.textContent = msg;
+      box.appendChild(t);
+      setTimeout(() => t.remove(), 3500);
+    }
+
+    // ── Tab filter ─────────────────────────────────────────────────────────
+    let _currentTab = 'all';
+    function setTab(tab) {
+      _currentTab = tab;
+      ['all','faculty','admin'].forEach(t => {
+        document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
+      });
+      filterUsers();
+    }
+
+    // ── Search + filter ────────────────────────────────────────────────────
+    function filterUsers() {
+      const q = document.getElementById('userSearch').value.toLowerCase();
+      document.querySelectorAll('.user-row').forEach(row => {
+        const matchRole = _currentTab === 'all' || row.dataset.role === _currentTab;
+        const matchQ    = !q || row.dataset.name.includes(q) || row.dataset.id.includes(q) || row.dataset.email.includes(q);
+        row.style.display = matchRole && matchQ ? '' : 'none';
+      });
+    }
+
+    // ── Create Modal ───────────────────────────────────────────────────────
+    async function openCreateModal() {
+      // Reset form
+      ['cu_name','cu_id','cu_email','cu_dept','cu_pwd'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('cu_role').value = 'faculty';
+      document.getElementById('createFlash').className = 'modal-flash';
+      document.getElementById('createCredBox').classList.remove('visible');
+      document.getElementById('btnCreate').style.display = 'inline-flex';
+      document.getElementById('btnCreate').disabled = false;
+      document.getElementById('btnCreate').textContent = 'Create User';
+
+      // Load cameras
+      const sel = document.getElementById('cu_camera');
+      sel.innerHTML = '<option value="">— None assigned yet —</option>';
+      try {
+        const d = await fetch('/api/cameras').then(r => r.json());
+        (d.cameras || []).forEach(cam => {
+          const opt = document.createElement('option');
+          opt.value = cam.id;
+          opt.textContent = cam.display_name || cam.sheet_name || cam.id;
+          sel.appendChild(opt);
+        });
+      } catch {}
+
+      document.getElementById('createModal').classList.add('open');
+    }
+
+    function closeCreateModal() {
+      document.getElementById('createModal').classList.remove('open');
+      if (document.getElementById('createCredBox').classList.contains('visible')) {
+        location.reload();
+      }
+    }
+
+    async function createUser() {
+      const name   = document.getElementById('cu_name').value.trim();
+      const uid    = document.getElementById('cu_id').value.trim();
+      const role   = document.getElementById('cu_role').value;
+      const email  = document.getElementById('cu_email').value.trim();
+      const dept   = document.getElementById('cu_dept').value.trim();
+      const camera = document.getElementById('cu_camera').value;
+      const pwd    = document.getElementById('cu_pwd').value;
+
+      const flash = document.getElementById('createFlash');
+      flash.className = 'modal-flash';
+
+      if (!name) { flash.className = 'modal-flash error'; flash.textContent = 'Full name is required.'; return; }
+      if (!uid)  { flash.className = 'modal-flash error'; flash.textContent = 'Faculty / Employee ID is required.'; return; }
+      if (!pwd || pwd.length < 8) { flash.className = 'modal-flash error'; flash.textContent = 'Password must be at least 8 characters.'; return; }
+
+      const btn = document.getElementById('btnCreate');
+      btn.disabled = true; btn.textContent = 'Creating…';
+
+      const body = {
+        user_id: uid, full_name: name, role, email,
+        password: pwd, must_change_password: true,
+        assigned_cameras: camera ? [camera] : [],
+      };
+      if (dept) body.department = dept;
+
+      try {
+        const res  = await fetch('/api/admin/users/create', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          // Show credentials
+          document.getElementById('newCredId').childNodes[0].textContent  = uid + ' ';
+          document.getElementById('newCredPwd').childNodes[0].textContent = pwd + ' ';
+          document.getElementById('createCredBox').classList.add('visible');
+          flash.className  = 'modal-flash success';
+          flash.textContent = `✅ ${name} (${uid}) created successfully!`;
+          btn.style.display = 'none';
+          showToast(`${name} created successfully`);
+        } else {
+          flash.className  = 'modal-flash error';
+          flash.textContent = data.message || 'Creation failed.';
+          btn.disabled = false; btn.textContent = 'Create User';
+        }
+      } catch(e) {
+        flash.className  = 'modal-flash error';
+        flash.textContent = 'Network error: ' + e.message;
+        btn.disabled = false; btn.textContent = 'Create User';
+      }
+    }
+
+    // ── Reset Password ─────────────────────────────────────────────────────
+    let _resetUid = '';
+    function openResetModal(uid, name) {
+      _resetUid = uid;
+      document.getElementById('resetFor').textContent = `For: ${name} (${uid})`;
+      document.getElementById('resetPwd').value = '';
+      document.getElementById('resetFlash').className = 'modal-flash';
+      document.getElementById('resetModal').classList.add('open');
+    }
+    function closeResetModal() {
+      document.getElementById('resetModal').classList.remove('open');
+    }
+    async function doResetPwd() {
+      const pwd = document.getElementById('resetPwd').value;
+      const flash = document.getElementById('resetFlash');
+      if (!pwd || pwd.length < 8) { flash.className = 'modal-flash error'; flash.textContent = 'Password must be at least 8 characters.'; return; }
+      try {
+        const res = await fetch(`/api/admin/users/${_resetUid}/reset-password`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd })
+        });
+        const d = await res.json();
+        if (d.status === 'success') {
+          showToast(d.message);
+          closeResetModal();
+        } else {
+          flash.className = 'modal-flash error'; flash.textContent = d.message;
+        }
+      } catch(e) { flash.className = 'modal-flash error'; flash.textContent = 'Network error: ' + e.message; }
+    }
+
+    // ── Unlock ─────────────────────────────────────────────────────────────
+    async function unlockUser(uid) {
+      const res = await fetch(`/api/admin/users/${uid}/unlock`, { method: 'POST' });
+      const d   = await res.json();
+      showToast(d.message, d.status === 'success');
+      if (d.status === 'success') setTimeout(() => location.reload(), 800);
+    }
+
+    // ── Deactivate ─────────────────────────────────────────────────────────
+    async function deactivateUser(uid, name) {
+      if (!confirm(`Deactivate ${name} (${uid})? They will be signed out immediately.`)) return;
+      const res = await fetch(`/api/admin/users/${uid}/deactivate`, { method: 'POST' });
+      const d   = await res.json();
+      showToast(d.message, d.status === 'success');
+      if (d.status === 'success') setTimeout(() => location.reload(), 800);
+    }
+
+    // ── Copy helper ────────────────────────────────────────────────────────
+    function copyVal(el) {
+      const text = el.childNodes[0]?.textContent?.trim() || '';
+      navigator.clipboard?.writeText(text)
+        .then(() => showToast('Copied to clipboard!'))
+        .catch(() => {});
+    }
+  </script>
+</body>
+</html>

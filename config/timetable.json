@@ -1,0 +1,63 @@
+{
+  "cam-001": {
+    "section_display": "CSE-A",
+    "schedule": [
+      {
+        "period": 1,
+        "start_time": "09:00",
+        "end_time": "10:00",
+        "subject": "Mathematics",
+        "subject_abbr": "Maths",
+        "faculty_email": "",
+        "faculty_name": ""
+      },
+      {
+        "period": 2,
+        "start_time": "10:00",
+        "end_time": "11:00",
+        "subject": "Physics",
+        "subject_abbr": "PHY",
+        "faculty_email": "",
+        "faculty_name": ""
+      },
+      {
+        "period": 3,
+        "start_time": "11:00",
+        "end_time": "12:00",
+        "subject": "DBMS",
+        "subject_abbr": "DBMS",
+        "faculty_email": "",
+        "faculty_name": ""
+      },
+      {
+        "period": 4,
+        "start_time": "13:00",
+        "end_time": "14:00",
+        "subject": "Operating Systems",
+        "subject_abbr": "OS",
+        "faculty_email": "",
+        "faculty_name": ""
+      }
+    ]
+  },
+  "cam-test-001": {
+    "schedule": [
+      {
+        "period": 1,
+        "start_time": "09:00",
+        "end_time": "10:00",
+        "subject": "DBMS",
+        "subject_abbr": "DBMS",
+        "faculty_email": ""
+      },
+      {
+        "period": 2,
+        "start_time": "10:00",
+        "end_time": "11:00",
+        "subject": "Maths",
+        "subject_abbr": "MTH",
+        "faculty_email": ""
+      }
+    ]
+  }
+}

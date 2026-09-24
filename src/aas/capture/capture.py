@@ -6,11 +6,13 @@ Supports:
     Mode A: Per-camera RTSP URL from cameras.json (multi-camera setup)
     Mode B: Fixed IP Camera (IP_CAMERA_URL env var, single-camera fallback)
     Mode C: Local webcam (WEBCAM_INDEX env var, for testing)
+    Mode D: Mobile upload — faculty phone photo via HTTP POST (v2.0 primary)
 
 Functions:
-    get_camera_source(camera_id)  → returns RTSP URL or webcam index
-    capture_single_shot(camera_id) → grab one frame, save, return path
-    capture_with_preview()        → show live preview, capture on SPACE bar
+    get_camera_source(camera_id)          → returns RTSP URL or webcam index
+    capture_single_shot(camera_id)        → grab one frame, save, return path
+    capture_with_preview()                → show live preview, capture on SPACE bar
+    capture_from_upload(file_bytes, cam_id) → save uploaded bytes, return path (v2.0)
 """
 
 import cv2
@@ -174,3 +176,44 @@ def capture_with_preview(save_path: str = None) -> str | None:
         return captured_path
     finally:
         _camera_lock.release()
+
+
+def capture_from_upload(file_bytes: bytes, camera_id: str = None) -> str:
+    """
+    Mode D — Save an uploaded photo (from faculty smartphone) to disk.
+
+    This is the primary capture mode for Single Shot AAS v2.0.
+    Faculty uses the browser PWA to take a photo; the JPEG bytes are
+    posted to Flask and passed here for storage before recognition.
+
+    Args:
+        file_bytes : Raw JPEG/PNG bytes from the HTTP multipart upload.
+        camera_id  : Optional camera ID used to organise sub-folders.
+                     If None, saves directly into CAPTURED_FOLDER.
+
+    Returns:
+        Absolute path to the saved image file.
+
+    Raises:
+        ValueError : If file_bytes is empty or None.
+        OSError    : If the target directory cannot be created.
+    """
+    if not file_bytes:
+        raise ValueError("capture_from_upload: file_bytes must not be empty.")
+
+    if camera_id:
+        save_dir = os.path.join(CAPTURED_FOLDER, camera_id)
+    else:
+        save_dir = CAPTURED_FOLDER
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    filename = f"upload_{ts}.jpg"
+    save_path = os.path.join(save_dir, filename)
+
+    with open(save_path, "wb") as f:
+        f.write(file_bytes)
+
+    print(f"  ✓ [Mode D] Upload saved: {save_path} ({len(file_bytes):,} bytes)")
+    return save_path

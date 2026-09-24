@@ -3,44 +3,728 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Single Shot AAS — Dashboard</title>
+  <title>Single Shot AAS — {% if layout == 'faculty' %}Faculty Portal{% else %}Admin Dashboard{% endif %}</title>
   <meta name="description" content="Single Shot AAS — AI-powered face recognition attendance system."/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/style.css"/>
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#0f1117"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+
+  <style>
+  /* ══════════════════════════════════════════════════
+     ROLE-IDENTITY CSS OVERRIDES
+  ══════════════════════════════════════════════════ */
+
+  /* ─── ADMIN Identity: Navy + Gold ─────────────────── */
+  body.admin-layout {
+    background-image:
+      radial-gradient(ellipse at 10% 0%,   rgba(79,142,247,0.09) 0%, transparent 55%),
+      radial-gradient(ellipse at 90% 100%, rgba(124,58,237,0.07) 0%, transparent 55%);
+  }
+  body.admin-layout .sidebar {
+    background: linear-gradient(180deg, #0d1220 0%, #0a0e1a 100%);
+    border-right: 1px solid rgba(79,142,247,0.18);
+  }
+  body.admin-layout .sidebar-logo {
+    border-bottom: 1px solid rgba(79,142,247,0.15);
+  }
+  body.admin-layout .logo-version {
+    color: #d4a017;
+    background: rgba(212,160,23,0.12);
+  }
+  body.admin-layout .nav-item.active {
+    background: rgba(79,142,247,0.14);
+    color: #7ab3ff;
+    border-left: 3px solid #4f8ef7;
+  }
+  body.admin-layout .nav-item:hover:not(.active) {
+    background: rgba(79,142,247,0.07);
+    color: #93c5fd;
+  }
+  body.admin-layout .topbar {
+    background: rgba(10,14,26,0.97);
+    border-bottom: 1px solid rgba(79,142,247,0.15);
+  }
+  body.admin-layout .btn-primary {
+    background: linear-gradient(135deg, #4f8ef7, #7c3aed);
+  }
+  .role-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em;
+  }
+  .role-badge.admin {
+    background: rgba(212,160,23,0.15);
+    color: #d4a017;
+    border: 1px solid rgba(212,160,23,0.3);
+  }
+  .role-badge.faculty {
+    background: rgba(16,185,129,0.15);
+    color: #10b981;
+    border: 1px solid rgba(16,185,129,0.3);
+  }
+
+  /* ─── FACULTY Identity: Teal + Emerald ────────────── */
+  body.faculty-layout {
+    background: #060d0f;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(16,185,129,0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 90%, rgba(6,182,212,0.08) 0%, transparent 50%);
+    overflow: auto;
+  }
+
+  /* ══ FACULTY VIEW ══════════════════════════════════════════════════════════ */
+  .faculty-view { display: none; }
+  .faculty-view.active { display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* Faculty topbar */
+  .fac-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px;
+    background: rgba(6,12,16,0.97);
+    border-bottom: 1px solid rgba(16,185,129,0.2);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .fac-topbar-brand {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .fac-topbar-brand .brand-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+  }
+  .fac-topbar-brand .brand-name {
+    font-size: 0.85rem; font-weight: 700; color: #e2e8f0;
+  }
+  .fac-topbar-right {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .fac-topbar-right .fac-time {
+    font-size: 0.72rem; color: rgba(148,163,184,0.6); font-variant-numeric: tabular-nums;
+  }
+  .fac-logout {
+    font-size: 0.72rem; color: rgba(148,163,184,0.5); text-decoration: none;
+    padding: 4px 10px; border-radius: 6px;
+    border: 1px solid rgba(148,163,184,0.15);
+    transition: all 0.2s;
+  }
+  .fac-logout:hover { color: #f87171; border-color: rgba(248,113,113,0.3); }
+
+  /* Faculty class card */
+  .fac-class-card {
+    margin: 20px 16px 0;
+    background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(6,182,212,0.08) 100%);
+    border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 20px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .fac-class-card::before {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, rgba(16,185,129,0.15) 0%, transparent 70%);
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+  }
+  .fac-card-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .fac-faculty-name {
+    font-size: 1.05rem; font-weight: 700; color: #e2e8f0;
+  }
+  .fac-faculty-id {
+    font-size: 0.7rem; color: rgba(148,163,184,0.6); margin-top: 2px;
+  }
+  .fac-status-pill {
+    padding: 4px 12px; border-radius: 20px; font-size: 0.68rem; font-weight: 700;
+    background: rgba(16,185,129,0.2); color: #10b981;
+    border: 1px solid rgba(16,185,129,0.35);
+    white-space: nowrap;
+  }
+  .fac-status-pill.idle {
+    background: rgba(100,116,139,0.15); color: #94a3b8;
+    border-color: rgba(100,116,139,0.25);
+  }
+  .fac-period-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px;
+  }
+  .fac-period-item {
+    background: rgba(0,0,0,0.2);
+    border-radius: 10px; padding: 10px 12px;
+  }
+  .fac-period-label {
+    font-size: 0.62rem; color: rgba(148,163,184,0.5); text-transform: uppercase;
+    letter-spacing: 0.08em; margin-bottom: 3px;
+  }
+  .fac-period-value {
+    font-size: 0.9rem; font-weight: 600; color: #e2e8f0;
+  }
+  .fac-period-value.subject { color: #34d399; }
+
+  /* Faculty action zone */
+  .fac-action-zone {
+    margin: 16px 16px 0;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .fac-action-title {
+    font-size: 0.72rem; color: rgba(148,163,184,0.5); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .fac-action-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .btn-fac-take {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 18px 12px;
+    background: linear-gradient(135deg, #059669, #0891b2);
+    border: none; border-radius: 16px;
+    color: #fff; font-family: inherit; font-weight: 700;
+    font-size: 0.85rem; cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(5,150,105,0.35);
+  }
+  .btn-fac-take:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(5,150,105,0.45); }
+  .btn-fac-take:active { transform: scale(0.97); }
+  .btn-fac-take .btn-icon { font-size: 1.6rem; }
+
+  .btn-fac-skip {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 18px 12px;
+    background: rgba(30,41,59,0.8);
+    border: 1px solid rgba(100,116,139,0.25); border-radius: 16px;
+    color: #94a3b8; font-family: inherit; font-weight: 600;
+    font-size: 0.85rem; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-fac-skip:hover {
+    background: rgba(51,65,85,0.8); color: #cbd5e1;
+    border-color: rgba(100,116,139,0.4);
+  }
+  .btn-fac-skip .btn-icon { font-size: 1.6rem; }
+
+  /* Faculty camera preview */
+  .fac-camera-wrap {
+    margin: 12px 16px 0;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 16px;
+    overflow: hidden;
+    display: none;
+  }
+  .fac-camera-wrap.visible { display: block; }
+  .fac-camera-wrap video {
+    width: 100%; display: block;
+    border-radius: 14px 14px 0 0;
+  }
+  .fac-camera-controls {
+    display: flex; gap: 8px; padding: 10px;
+  }
+  .btn-fac-capture {
+    flex: 1; padding: 12px; border-radius: 12px;
+    background: linear-gradient(135deg, #10b981, #0891b2);
+    border: none; color: #fff; font-family: inherit;
+    font-weight: 700; font-size: 0.9rem; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-fac-capture:hover { opacity: 0.9; }
+  .btn-fac-cancel-cam {
+    padding: 12px 16px; border-radius: 12px;
+    background: rgba(248,113,113,0.15);
+    border: 1px solid rgba(248,113,113,0.3);
+    color: #f87171; font-family: inherit;
+    font-weight: 600; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-fac-cancel-cam:hover { background: rgba(248,113,113,0.25); }
+  canvas#capture-canvas { display: none; }
+
+  /* Faculty results */
+  .fac-results {
+    margin: 12px 16px 0;
+    display: none;
+  }
+  .fac-results.visible { display: block; }
+  .fac-result-banner {
+    padding: 14px 16px; border-radius: 14px; margin-bottom: 10px;
+    background: rgba(16,185,129,0.12);
+    border: 1px solid rgba(16,185,129,0.25);
+  }
+  .fac-result-banner.has-absent {
+    background: rgba(245,158,11,0.1);
+    border-color: rgba(245,158,11,0.25);
+  }
+  .fac-result-stats {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9rem; font-weight: 700;
+  }
+  .fac-stat-present { color: #10b981; }
+  .fac-stat-absent  { color: #f59e0b; }
+
+  .fac-absent-list {
+    background: rgba(13,17,23,0.6);
+    border: 1px solid rgba(48,54,61,0.8);
+    border-radius: 14px; overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .fac-absent-header {
+    padding: 10px 14px; font-size: 0.72rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em; color: #f59e0b;
+    background: rgba(245,158,11,0.08);
+    border-bottom: 1px solid rgba(48,54,61,0.8);
+  }
+  .fac-absent-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-bottom: 1px solid rgba(48,54,61,0.5);
+    font-size: 0.85rem;
+  }
+  .fac-absent-row:last-child { border-bottom: none; }
+  .fac-mark-present {
+    padding: 5px 12px; border-radius: 8px;
+    background: rgba(16,185,129,0.15); color: #10b981;
+    border: 1px solid rgba(16,185,129,0.3);
+    font-family: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .fac-mark-present:hover { background: rgba(16,185,129,0.25); }
+
+  /* Faculty confirm bar */
+  .fac-confirm-bar {
+    margin: 12px 16px 24px;
+    display: none;
+  }
+  .fac-confirm-bar.visible { display: flex; gap: 8px; }
+  .btn-fac-confirm {
+    flex: 1; padding: 14px;
+    background: linear-gradient(135deg, #059669, #0891b2);
+    border: none; border-radius: 14px; color: #fff;
+    font-family: inherit; font-weight: 700; font-size: 0.95rem; cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-fac-confirm:hover { opacity: 0.9; }
+  .btn-fac-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-fac-retake {
+    padding: 14px 18px; border-radius: 14px;
+    background: rgba(100,116,139,0.15);
+    border: 1px solid rgba(100,116,139,0.25);
+    color: #94a3b8; font-family: inherit; font-weight: 600; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-fac-retake:hover { background: rgba(100,116,139,0.25); color: #cbd5e1; }
+
+  /* Faculty skip confirmation */
+  .fac-skip-confirm {
+    margin: 12px 16px; padding: 16px;
+    background: rgba(51,65,85,0.5);
+    border: 1px solid rgba(100,116,139,0.25);
+    border-radius: 14px;
+    display: none; text-align: center;
+  }
+  .fac-skip-confirm.visible { display: block; }
+  .fac-skip-confirm p { font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px; }
+  .fac-skip-btns { display: flex; gap: 8px; }
+  .btn-confirm-skip {
+    flex: 1; padding: 10px; border-radius: 10px;
+    background: rgba(239,68,68,0.15); color: #f87171;
+    border: 1px solid rgba(239,68,68,0.3);
+    font-family: inherit; font-weight: 600; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-confirm-skip:hover { background: rgba(239,68,68,0.25); }
+  .btn-cancel-skip {
+    flex: 1; padding: 10px; border-radius: 10px;
+    background: rgba(16,185,129,0.12); color: #10b981;
+    border: 1px solid rgba(16,185,129,0.25);
+    font-family: inherit; font-weight: 600; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-cancel-skip:hover { background: rgba(16,185,129,0.22); }
+
+  /* Faculty spinner */
+  .fac-spinner-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(6,12,16,0.85);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    backdrop-filter: blur(4px);
+  }
+  .fac-spinner-overlay.visible { display: flex; }
+  .fac-spinner {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 3px solid rgba(16,185,129,0.2);
+    border-top-color: #10b981;
+    animation: spin 0.9s linear infinite;
+  }
+  .fac-spinner-label { font-size: 0.85rem; color: #94a3b8; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Manual add overlay */
+  .fac-manual-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  .fac-manual-overlay.visible { display: flex; }
+  .fac-manual-sheet {
+    width: 100%; max-width: 500px;
+    background: #0d1117; border-radius: 20px 20px 0 0;
+    border-top: 1px solid rgba(48,54,61,0.8);
+    padding: 16px; max-height: 70vh; display: flex; flex-direction: column;
+  }
+  .fac-manual-handle {
+    width: 40px; height: 4px; background: rgba(148,163,184,0.3);
+    border-radius: 2px; margin: 0 auto 14px; flex-shrink: 0;
+  }
+  .fac-manual-search {
+    width: 100%; padding: 10px 14px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(48,54,61,0.8);
+    border-radius: 10px; color: #e6edf3; font-family: inherit; font-size: 0.9rem;
+    outline: none; margin-bottom: 10px; flex-shrink: 0;
+  }
+  .fac-manual-search:focus { border-color: #10b981; }
+  .fac-manual-results { overflow-y: auto; flex: 1; }
+  .fac-manual-item {
+    padding: 12px 14px; border-radius: 10px; cursor: pointer;
+    font-size: 0.9rem; transition: background 0.15s;
+  }
+  .fac-manual-item:hover { background: rgba(16,185,129,0.1); color: #34d399; }
+
+  /* ═══════════════════════════════════════════════════
+     ADMIN — Faculty Management Section
+  ═══════════════════════════════════════════════════ */
+  .faculty-mgmt-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .faculty-mgmt-stats {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .fmgmt-stat {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+  }
+  .fmgmt-stat-num {
+    font-size: 1.6rem; font-weight: 800; color: #7ab3ff;
+    line-height: 1;
+  }
+  .fmgmt-stat-lbl { font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px; }
+
+  .faculty-table-wrap {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden;
+  }
+  .faculty-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .faculty-table th {
+    padding: 0.75rem 1rem; text-align: left; color: var(--text-secondary);
+    font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--border);
+  }
+  .faculty-table td {
+    padding: 0.85rem 1rem; border-bottom: 1px solid rgba(48,54,61,0.4);
+    vertical-align: middle;
+  }
+  .faculty-table tr:last-child td { border-bottom: none; }
+  .faculty-table tr:hover td { background: rgba(255,255,255,0.015); }
+
+  .faculty-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #4f8ef7, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+  .faculty-name-cell {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .faculty-name-info .fn { font-weight: 600; color: var(--text-primary); }
+  .faculty-name-info .fi { font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; }
+
+  .cam-chip {
+    display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.68rem;
+    font-weight: 600; background: rgba(88,166,255,0.12); color: #58a6ff;
+    border: 1px solid rgba(88,166,255,0.2); margin: 1px;
+  }
+
+  .action-row { display: flex; gap: 5px; flex-wrap: wrap; }
+
+  /* Faculty Modal */
+  #facModal {
+    display: none; position: fixed; inset: 0; z-index: 400;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+    align-items: center; justify-content: center;
+  }
+  #facModal.open { display: flex; }
+  .fac-modal-box {
+    background: #131a27; border: 1px solid rgba(79,142,247,0.2);
+    border-radius: 18px; padding: 28px; width: min(500px, 94vw);
+    display: flex; flex-direction: column; gap: 16px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .fac-modal-box h2 { font-size: 1rem; font-weight: 700; }
+  .fac-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .fac-modal-group { display: flex; flex-direction: column; gap: 5px; }
+  .fac-modal-group.full { grid-column: 1 / -1; }
+  .fac-modal-group label {
+    font-size: 0.72rem; color: var(--text-secondary); font-weight: 500;
+  }
+  .fac-modal-group input,
+  .fac-modal-group select {
+    padding: 0.65rem 0.9rem;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text-primary); font-family: inherit;
+    font-size: 0.85rem; outline: none; transition: border 0.2s;
+  }
+  .fac-modal-group input:focus,
+  .fac-modal-group select:focus { border-color: #4f8ef7; }
+  .fac-modal-group select option { background: #131a27; }
+  .fac-modal-group .hint {
+    font-size: 0.68rem; color: var(--text-muted);
+  }
+
+  .cred-box {
+    background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25);
+    border-radius: 10px; padding: 14px; display: none; flex-direction: column; gap: 8px;
+  }
+  .cred-box.visible { display: flex; }
+  .cred-box h4 { font-size: 0.78rem; font-weight: 700; color: #10b981; margin-bottom: 2px; }
+  .cred-item { display: flex; justify-content: space-between; align-items: center; }
+  .cred-label { font-size: 0.72rem; color: var(--text-secondary); }
+  .cred-value {
+    font-family: monospace; font-size: 0.85rem; color: #34d399;
+    background: rgba(0,0,0,0.3); padding: 3px 10px; border-radius: 6px;
+    cursor: pointer; transition: background 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .cred-value:hover { background: rgba(0,0,0,0.5); }
+
+  .fac-modal-flash {
+    padding: 8px 12px; border-radius: 8px; font-size: 0.78rem;
+    display: none;
+  }
+  .fac-modal-flash.error {
+    display: block; background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.3); color: #fca5a5;
+  }
+  .fac-modal-flash.success {
+    display: block; background: rgba(16,185,129,0.12);
+    border: 1px solid rgba(16,185,129,0.25); color: #6ee7b7;
+  }
+  .fac-modal-btns { display: flex; gap: 10px; }
+
+  /* ── Reset Password Modal ── */
+  #resetModal {
+    display: none; position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+    align-items: center; justify-content: center;
+  }
+  #resetModal.open { display: flex; }
+  .reset-modal-box {
+    background: #131a27; border: 1px solid rgba(79,142,247,0.2);
+    border-radius: 16px; padding: 24px; width: min(400px, 92vw);
+    display: flex; flex-direction: column; gap: 14px;
+  }
+
+  /* ═══════════════════════════════════════════════════
+     ADMIN NAV — faculty section
+  ═══════════════════════════════════════════════════ */
+  .nav-section-label {
+    font-size: 0.6rem; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 14px 16px 4px;
+  }
+
+  /* ═══════════════════════════════════════════════════
+     COMMON UTILITIES
+  ═══════════════════════════════════════════════════ */
+  .hidden { display: none !important; }
+  .btn { padding: .55rem 1.1rem; border-radius: 8px; border: none; font-family: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; transition: opacity .2s; }
+  .btn:hover { opacity: .85; }
+  .btn-sm { padding: .38rem .75rem; font-size: .75rem; }
+  .btn-primary { background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); color: #fff; }
+  .btn-danger { background: rgba(248,81,73,.15); color: var(--accent-red); border: 1px solid rgba(248,81,73,.3); }
+  .btn-success { background: rgba(63,185,80,.15); color: var(--accent-green); border: 1px solid rgba(63,185,80,.3); }
+  .btn-full { width: 100%; }
+
+  .acct-badge-wrap {
+    display: flex; align-items: center; gap: 8px;
+  }
+  </style>
 </head>
 <body>
 
-<!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
+<!-- ══ FACULTY VIEW ══════════════════════════════════════════════════════════ -->
+<div id="faculty-view" class="faculty-view">
+
+  <!-- Faculty Topbar -->
+  <div class="fac-topbar">
+    <div class="fac-topbar-brand">
+      <div class="brand-icon">📸</div>
+      <div>
+        <div class="brand-name">Single Shot AAS</div>
+        <div style="font-size:0.62rem;color:rgba(148,163,184,0.4);">Faculty Portal</div>
+      </div>
+    </div>
+    <div class="fac-topbar-right">
+      <span class="role-badge faculty">● FACULTY</span>
+      <span class="fac-time" id="facTime"></span>
+      <a href="/logout" class="fac-logout">⎋ Logout</a>
+    </div>
+  </div>
+
+  <!-- Class Info Card -->
+  <div class="fac-class-card" id="facClassCard">
+    <div class="fac-card-header">
+      <div>
+        <div class="fac-faculty-name" id="facName">—</div>
+        <div class="fac-faculty-id" id="facId">—</div>
+      </div>
+      <div class="fac-status-pill idle" id="facStatusPill">Idle</div>
+    </div>
+    <div class="fac-period-row">
+      <div class="fac-period-item">
+        <div class="fac-period-label">Subject</div>
+        <div class="fac-period-value subject" id="facSubject">—</div>
+      </div>
+      <div class="fac-period-item">
+        <div class="fac-period-label">Period</div>
+        <div class="fac-period-value" id="facPeriod">—</div>
+      </div>
+      <div class="fac-period-item">
+        <div class="fac-period-label">Section / Camera</div>
+        <div class="fac-period-value" id="facSection">—</div>
+      </div>
+      <div class="fac-period-item">
+        <div class="fac-period-label">Date</div>
+        <div class="fac-period-value" id="facDate">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Zone -->
+  <div class="fac-action-zone" id="facActionZone">
+    <div class="fac-action-title">Attendance Action</div>
+    <div class="fac-action-row">
+      <button class="btn-fac-take" id="btnTakeAttendance">
+        <span class="btn-icon">📷</span>
+        <span>Take Attendance</span>
+      </button>
+      <button class="btn-fac-skip" id="btnSkipAttendance">
+        <span class="btn-icon">⏭</span>
+        <span>Skip / No Attendance</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Skip Confirm Panel -->
+  <div class="fac-skip-confirm" id="facSkipConfirm">
+    <p>Are you sure you want to skip attendance for this session? This action will be logged.</p>
+    <div class="fac-skip-btns">
+      <button class="btn-confirm-skip" id="btnConfirmSkip">Yes, Skip Session</button>
+      <button class="btn-cancel-skip" onclick="hideSkipConfirm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Camera Preview -->
+  <div class="fac-camera-wrap" id="facCameraWrap">
+    <video id="facCameraFeed" autoplay playsinline muted></video>
+    <canvas id="capture-canvas"></canvas>
+    <div class="fac-camera-controls">
+      <button class="btn-fac-capture" id="btnFacCapture">📸 Capture & Recognise</button>
+      <button class="btn-fac-cancel-cam" id="btnFacCancelCam">✕ Cancel</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="fac-results" id="facResults">
+    <div class="fac-result-banner" id="facResultBanner">
+      <div class="fac-result-stats">
+        <div class="fac-stat-present" id="facStatPresent">✅ 0 Present</div>
+        <div class="fac-stat-absent"  id="facStatAbsent">⚠️ 0 Absent</div>
+      </div>
+    </div>
+    <div class="fac-absent-list" id="facAbsentList" style="display:none">
+      <div class="fac-absent-header">Absent Students</div>
+      <div id="facAbsentRows"></div>
+      <div style="padding:8px 14px;">
+        <button class="btn btn-sm" onclick="showFacManualAdd()" style="width:100%;background:rgba(16,185,129,0.08);color:#10b981;border:1px solid rgba(16,185,129,0.2);">➕ Add Student Manually</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Bar -->
+  <div class="fac-confirm-bar" id="facConfirmBar">
+    <button class="btn-fac-confirm" id="btnFacConfirm">✔ Confirm &amp; Submit Attendance</button>
+    <button class="btn-fac-retake" id="btnFacRetake">🔄 Retake</button>
+  </div>
+
+  <!-- Spinner -->
+  <div class="fac-spinner-overlay" id="facSpinner">
+    <div class="fac-spinner"></div>
+    <div class="fac-spinner-label" id="facSpinnerLabel">Processing...</div>
+  </div>
+
+  <!-- Manual Add Sheet -->
+  <div class="fac-manual-overlay" id="facManualOverlay">
+    <div class="fac-manual-sheet">
+      <div class="fac-manual-handle"></div>
+      <input class="fac-manual-search" id="facManualSearch" type="search" placeholder="🔍 Search student..." autocomplete="off"/>
+      <div class="fac-manual-results" id="facManualResults"></div>
+    </div>
+  </div>
+
+</div><!-- /#faculty-view -->
+
+
+<!-- ══ ADMIN VIEW ════════════════════════════════════════════════════════════ -->
+<div id="admin-view" class="admin-view" style="display:none">
+
+<!-- ── SIDEBAR ──────────────────────────────────────────────────────────── -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <div class="logo-icon">🎓</div>
     <div class="logo-text">
       <span class="logo-title">Single Shot AAS</span>
-      <span class="logo-version">v2.0</span>
+      <span class="logo-version">Admin v2.0</span>
     </div>
   </div>
 
   <nav class="sidebar-nav">
-    <a class="nav-item active" id="nav-dashboard"  onclick="showSection('dashboard')">
+    <div class="nav-section-label">Overview</div>
+    <a class="nav-item active" id="nav-dashboard" onclick="showSection('dashboard')">
       <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
     </a>
     <a class="nav-item" id="nav-attendance" onclick="showSection('attendance')">
       <span class="nav-icon">📷</span><span class="nav-label">Take Attendance</span>
     </a>
-    <a class="nav-item" id="nav-enroll"     onclick="showSection('enroll')">
+
+    <div class="nav-section-label">Students</div>
+    <a class="nav-item" id="nav-enroll" onclick="showSection('enroll')">
       <span class="nav-icon">➕</span><span class="nav-label">Enroll Student</span>
     </a>
-    <a class="nav-item" id="nav-students"   onclick="showSection('students')">
+    <a class="nav-item" id="nav-students" onclick="showSection('students')">
       <span class="nav-icon">👥</span><span class="nav-label">Students</span>
     </a>
-    <a class="nav-item" id="nav-history"    onclick="showSection('history')">
+    <a class="nav-item" id="nav-history" onclick="showSection('history')">
       <span class="nav-icon">📋</span><span class="nav-label">Attendance Log</span>
     </a>
-    <a class="nav-item" id="nav-reports"    onclick="showSection('reports')">
+    <a class="nav-item" id="nav-reports" onclick="showSection('reports')">
       <span class="nav-icon">📈</span><span class="nav-label">Reports</span>
     </a>
-    <a class="nav-item" id="nav-settings"   onclick="showSection('settings')">
+
+    <div class="nav-section-label">Administration</div>
+    <a class="nav-item" id="nav-faculty" onclick="showSection('faculty')">
+      <span class="nav-icon">👩‍🏫</span><span class="nav-label">Faculty</span>
+    </a>
+    <a class="nav-item" id="nav-settings" onclick="showSection('settings')">
       <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
     </a>
   </nav>
@@ -50,19 +734,22 @@
   </div>
 </aside>
 
-<!-- ══ MAIN CONTENT ═════════════════════════════════════════════════════════ -->
+<!-- ── MAIN CONTENT ─────────────────────────────────────────────────────── -->
 <div class="layout">
 
-  <!-- Top bar -->
+  <!-- Topbar -->
   <header class="topbar">
     <button class="menu-btn" onclick="toggleSidebar()">☰</button>
     <h1 class="topbar-title" id="pageTitle">Dashboard</h1>
-      <div class="topbar-right">
-        <span class="topbar-time" id="topbarTime"></span>
-        <div class="creds-badge" id="credsBadge" title="Google account status">⚡</div>
-        <span id="topbarUser" style="font-size:.8rem;color:var(--muted);margin-left:.5rem;"></span>
-        <a href="/logout" style="font-size:.78rem;color:var(--muted);text-decoration:none;margin-left:.75rem;" title="Sign out">⎋ Logout</a>
+    <div class="topbar-right">
+      <span class="topbar-time" id="topbarTime"></span>
+      <div class="creds-badge" id="credsBadge" title="Google account status">⚡</div>
+      <div class="acct-badge-wrap">
+        <span class="role-badge admin">★ ADMIN</span>
+        <span id="topbarUser" style="font-size:.8rem;color:var(--text-secondary);margin-left:.25rem;"></span>
       </div>
+      <a href="/logout" style="font-size:.78rem;color:var(--text-secondary);text-decoration:none;margin-left:.75rem;" title="Sign out">⎋ Logout</a>
+    </div>
   </header>
 
   <main class="main-content">
@@ -98,6 +785,13 @@
             <div class="stat-lbl">Encodings Loaded</div>
           </div>
         </div>
+        <div class="stat-card" style="border-color:rgba(163,113,247,0.35)">
+          <div class="stat-icon">👩‍🏫</div>
+          <div class="stat-body">
+            <div class="stat-num" id="d-faculty">—</div>
+            <div class="stat-lbl">Faculty Members</div>
+          </div>
+        </div>
       </div>
 
       <!-- Quick Actions -->
@@ -110,8 +804,8 @@
           <button class="qa-btn" onclick="showSection('enroll')">
             <span>➕</span><span>Enroll Student</span>
           </button>
-          <button class="qa-btn" onclick="showSection('students')">
-            <span>👥</span><span>View Students</span>
+          <button class="qa-btn" onclick="showSection('faculty')">
+            <span>👩‍🏫</span><span>Add Faculty</span>
           </button>
           <button class="qa-btn" onclick="showSection('history')">
             <span>📋</span><span>Today's Log</span>
@@ -141,7 +835,7 @@
           </div>
         </div>
         <div id="cameraGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;margin-top:.75rem;">
-          <div class="empty-state" id="cameraGridEmpty"><span>📷</span><p>No cameras registered. <a href="/setup/step3" style="color:var(--accent);">Configure cameras →</a></p></div>
+          <div class="empty-state" id="cameraGridEmpty"><span>📷</span><p>No cameras registered. <a href="/setup/step3" style="color:var(--accent-blue);">Configure cameras →</a></p></div>
         </div>
       </div>
 
@@ -155,7 +849,6 @@
     <!-- ══ SECTION: ATTENDANCE ═════════════════════════════════════════════ -->
     <section id="sec-attendance" class="section">
       <div class="two-col">
-
         <!-- Left: Capture modes -->
         <div class="panel">
           <h2 class="panel-title">Capture Mode</h2>
@@ -228,7 +921,7 @@
         <button class="tab"        id="etab-upload-btn"  onclick="switchEnrollTab('upload')">📁 Upload Photos</button>
       </div>
 
-      <!-- ── Webcam Enrollment ── -->
+      <!-- Webcam Enrollment -->
       <div id="etab-webcam">
         <div class="two-col">
           <div class="panel">
@@ -291,7 +984,7 @@
         </div>
       </div>
 
-      <!-- ── Upload Enrollment ── -->
+      <!-- Upload Enrollment -->
       <div id="etab-upload" style="display:none">
         <div class="two-col">
           <div class="panel">
@@ -392,6 +1085,57 @@
       </div>
     </section>
 
+    <!-- ══ SECTION: FACULTY MANAGEMENT ════════════════════════════════════ -->
+    <section id="sec-faculty" class="section">
+
+      <!-- Stats row -->
+      <div class="faculty-mgmt-stats" id="facMgmtStats">
+        <div class="fmgmt-stat">
+          <div class="fmgmt-stat-num" id="fms-total">—</div>
+          <div class="fmgmt-stat-lbl">Total Faculty</div>
+        </div>
+        <div class="fmgmt-stat">
+          <div class="fmgmt-stat-num" id="fms-active" style="color:#10b981">—</div>
+          <div class="fmgmt-stat-lbl">Active</div>
+        </div>
+        <div class="fmgmt-stat">
+          <div class="fmgmt-stat-num" id="fms-locked" style="color:#f87171">—</div>
+          <div class="fmgmt-stat-lbl">Locked</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="faculty-mgmt-header">
+          <h2 class="panel-title">👩‍🏫 Faculty Members</h2>
+          <div class="panel-actions">
+            <input class="search-input" id="facultySearch" placeholder="🔍 Search faculty..." oninput="filterFaculty()"/>
+            <button class="btn btn-primary btn-sm" onclick="openFacModal()">+ Add Faculty</button>
+          </div>
+        </div>
+
+        <div class="faculty-table-wrap" id="facultyTableWrap">
+          <table class="faculty-table">
+            <thead>
+              <tr>
+                <th>Faculty</th>
+                <th>Faculty ID</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Cameras</th>
+                <th>Last Login</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="facultyTableBody">
+              <tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:2rem;">
+                <div class="spinner-sm" style="display:inline-block;margin-right:8px;"></div> Loading faculty...
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- ══ SECTION: SETTINGS ═══════════════════════════════════════════════ -->
     <section id="sec-settings" class="section">
       <div class="two-col">
@@ -449,7 +1193,7 @@
         <div id="credsStatus" class="creds-info"></div>
         <div class="creds-steps">
           <div class="step-item"><span class="step-num">1</span><span>Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a></span></div>
-          <div class="step-item"><span class="step-num">2</span><span>IAM & Admin → Service Accounts → Create Service Account</span></div>
+          <div class="step-item"><span class="step-num">2</span><span>IAM &amp; Admin → Service Accounts → Create Service Account</span></div>
           <div class="step-item"><span class="step-num">3</span><span>Keys → Add Key → JSON → Download</span></div>
           <div class="step-item"><span class="step-num">4</span><span>Save as <code>credentials.json</code> inside <code>face recognition source code/</code></span></div>
           <div class="step-item"><span class="step-num">5</span><span>Share your Google Sheet with the service account email</span></div>
@@ -466,6 +1210,8 @@
 
   </main>
 </div>
+</div><!-- /#admin-view -->
+
 
 <!-- ══ LOADING OVERLAY ════════════════════════════════════════════════════════ -->
 <div class="loading-overlay" id="loadingOverlay" style="display:none">
@@ -491,60 +1237,112 @@
   </div>
 </div>
 
+<!-- ══ FACULTY MODAL (Admin) ══════════════════════════════════════════════════ -->
+<div id="facModal">
+  <div class="fac-modal-box">
+    <h2>👩‍🏫 Add Faculty Profile</h2>
+    <div class="fac-modal-flash" id="facModalFlash"></div>
+
+    <div class="fac-modal-grid">
+      <div class="fac-modal-group full">
+        <label>Full Name *</label>
+        <input type="text" id="fm-name" placeholder="Dr. Jane Smith"/>
+      </div>
+      <div class="fac-modal-group">
+        <label>Faculty ID (auto-generated if blank)</label>
+        <input type="text" id="fm-id" placeholder="FAC-001"/>
+        <span class="hint">Leave blank to auto-assign next available ID</span>
+      </div>
+      <div class="fac-modal-group">
+        <label>Department / Subject</label>
+        <input type="text" id="fm-dept" placeholder="e.g. Computer Science"/>
+      </div>
+      <div class="fac-modal-group full">
+        <label>Email Address</label>
+        <input type="email" id="fm-email" placeholder="faculty@institution.edu"/>
+      </div>
+      <div class="fac-modal-group">
+        <label>Temporary Password *</label>
+        <input type="password" id="fm-pwd" placeholder="Min 8 characters"/>
+      </div>
+      <div class="fac-modal-group">
+        <label>Assign Camera / Section</label>
+        <select id="fm-camera">
+          <option value="">— None assigned yet —</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Credentials Box (shown after creation) -->
+    <div class="cred-box" id="facCredBox">
+      <h4>✅ Faculty Account Created — Share Credentials</h4>
+      <div class="cred-item">
+        <span class="cred-label">Faculty ID (Login):</span>
+        <span class="cred-value" id="credId" onclick="copyText(this)" title="Click to copy">— <span style="font-size:0.65rem;opacity:0.6">📋</span></span>
+      </div>
+      <div class="cred-item">
+        <span class="cred-label">Temporary Password:</span>
+        <span class="cred-value" id="credPwd" onclick="copyText(this)" title="Click to copy">— <span style="font-size:0.65rem;opacity:0.6">📋</span></span>
+      </div>
+      <p style="font-size:0.68rem;color:rgba(148,163,184,0.5);margin-top:4px;">Faculty must change password on first login.</p>
+    </div>
+
+    <div class="fac-modal-btns">
+      <button class="btn btn-primary" style="flex:1" id="btnCreateFaculty" onclick="createFaculty()">Create Faculty</button>
+      <button class="btn" style="flex:1;background:rgba(255,255,255,.05);" onclick="closeFacModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RESET PASSWORD MODAL ════════════════════════════════════════════════════ -->
+<div id="resetModal">
+  <div class="reset-modal-box">
+    <h2 style="font-size:1rem;font-weight:700;">🔑 Reset Password</h2>
+    <p style="font-size:0.78rem;color:var(--text-secondary);" id="resetModalFor">For: —</p>
+    <div class="fac-modal-group" style="margin-top:4px;">
+      <label>New Password (min 8 chars)</label>
+      <input type="password" id="resetPwdInput" placeholder="New password"/>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn btn-primary" style="flex:1" onclick="doResetPwd()">Reset Password</button>
+      <button class="btn" style="flex:1;background:rgba(255,255,255,.05);" onclick="closeResetModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
-//  STATE
+//  CONSTANTS (injected by Jinja2)
 // ═══════════════════════════════════════════════════════════════════════════
-let currentSection = 'dashboard';
-let webcamStream   = null;
-let enrollAngles   = { front: false, left: false, right: false };
-let currentAngleIdx = 0;
-const ANGLE_ORDER  = ['front', 'left', 'right'];
-const ANGLE_LABELS = { front: '😐 Look STRAIGHT at the camera', left: '👈 Turn head slightly LEFT', right: '👉 Turn head slightly RIGHT' };
-let currentEnrollName = '';
-let allStudentsData   = [];
-let streamActive = false;
-let lastAnnotatedSrc  = '';
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  NAVIGATION
-// ═══════════════════════════════════════════════════════════════════════════
-function showSection(id) {
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('sec-' + id).classList.add('active');
-  document.getElementById('nav-' + id).classList.add('active');
-  currentSection = id;
-  const titles = { dashboard:'Dashboard', attendance:'Take Attendance', enroll:'Enroll Student', students:'Students', history:'Attendance Log', reports:'Reports', settings:'Settings' };
-  document.getElementById('pageTitle').textContent = titles[id] || id;
-  // Section-specific loads
-  if (id === 'students')  loadStudents();
-  if (id === 'history')   loadTodayAttendance();
-  if (id === 'reports')   loadReports();
-  if (id === 'settings')  loadSettings();
-  if (id === 'dashboard') loadDashboard();
-  stopStream();
-}
-
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('collapsed');
-  document.querySelector('.layout').classList.toggle('sidebar-collapsed');
-}
+const LAYOUT             = "{{ layout | default('admin') }}";
+const ASSIGNED_CAMERA_ID = "{{ cameras[0].id if cameras else '' }}";
+const CURRENT_SUBJECT    = "{{ (current_periods.values()|list)[0].subject if current_periods else '' }}";
+const CURRENT_PERIOD_NUM = {{ (current_periods.values()|list)[0].period_num if current_periods else 0 }};
+const FACULTY_NAME       = "{{ user_name | default('Faculty') }}";
+const FACULTY_EMAIL      = "{{ user_email | default('') }}";
+const FACULTY_ID         = "{{ user_id | default('') }}";
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CLOCK
 // ═══════════════════════════════════════════════════════════════════════════
 function updateClock() {
   const now = new Date();
-  document.getElementById('topbarTime').textContent =
-    now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const ts  = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     + '  ' + now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  const topTime = document.getElementById('topbarTime');
+  const facTime = document.getElementById('facTime');
+  if (topTime) topTime.textContent = ts;
+  if (facTime)  facTime.textContent  = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  const facDate = document.getElementById('facDate');
+  if (facDate) facDate.textContent = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 setInterval(updateClock, 1000);
 updateClock();
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TOAST NOTIFICATIONS
+//  TOAST
 // ═══════════════════════════════════════════════════════════════════════════
 function toast(msg, type = 'info', dur = 4000) {
   const c = document.getElementById('toastContainer');
@@ -580,20 +1378,340 @@ function confirm(title, msg, cb) {
 }
 function closeModal() { document.getElementById('confirmModal').style.display = 'none'; }
 
+
 // ═══════════════════════════════════════════════════════════════════════════
-//  STATUS CHECK
+//  DOMContentLoaded BRANCH
 // ═══════════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  if (LAYOUT === 'faculty') {
+    initFacultyView();
+  } else {
+    initAdminView();
+  }
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ██████████  FACULTY VIEW
+═══════════════════════════════════════════════════════════════════════════ */
+
+let _facCameraStream = null;
+let _facPresentNames = new Set();
+let _facAbsentList   = [];
+let _facAllStudents  = [];
+
+function initFacultyView() {
+  document.body.classList.add('faculty-layout');
+  document.getElementById('faculty-view').classList.add('active');
+
+  // Populate class card
+  document.getElementById('facName').textContent    = FACULTY_NAME || 'Faculty';
+  document.getElementById('facId').textContent      = FACULTY_ID   || '—';
+  document.getElementById('facSubject').textContent = CURRENT_SUBJECT || '—';
+  document.getElementById('facPeriod').textContent  = CURRENT_PERIOD_NUM ? `Period ${CURRENT_PERIOD_NUM}` : '—';
+  document.getElementById('facSection').textContent = ASSIGNED_CAMERA_ID || '—';
+
+  // Bind actions
+  document.getElementById('btnTakeAttendance').addEventListener('click', startFacTakeAttendance);
+  document.getElementById('btnSkipAttendance').addEventListener('click', showSkipConfirm);
+  document.getElementById('btnConfirmSkip').addEventListener('click', confirmSkip);
+  document.getElementById('btnFacCapture').addEventListener('click', facCapture);
+  document.getElementById('btnFacCancelCam').addEventListener('click', facCancelCamera);
+  document.getElementById('btnFacConfirm').addEventListener('click', facConfirmSubmit);
+  document.getElementById('btnFacRetake').addEventListener('click', () => {
+    // Reset results and retake
+    document.getElementById('facResults').classList.remove('visible');
+    document.getElementById('facConfirmBar').classList.remove('visible');
+    document.getElementById('facActionZone').style.display = 'flex';
+    _facPresentNames.clear(); _facAbsentList = [];
+  });
+  document.getElementById('facManualSearch').addEventListener('input', filterFacManual);
+}
+
+// ── Take Attendance ────────────────────────────────────────────────────────
+async function startFacTakeAttendance() {
+  document.getElementById('facStatusPill').textContent = 'Capturing…';
+  document.getElementById('facStatusPill').className   = 'fac-status-pill';
+  document.getElementById('facActionZone').style.display = 'none';
+  try {
+    _facCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+      audio: false
+    });
+    const video = document.getElementById('facCameraFeed');
+    video.srcObject = _facCameraStream;
+    document.getElementById('facCameraWrap').classList.add('visible');
+  } catch (err) {
+    toast('Camera access denied: ' + err.message, 'error');
+    resetFacActionZone();
+  }
+}
+
+function facCancelCamera() {
+  stopFacCamera();
+  resetFacActionZone();
+}
+
+function stopFacCamera() {
+  if (_facCameraStream) {
+    _facCameraStream.getTracks().forEach(t => t.stop());
+    _facCameraStream = null;
+  }
+  document.getElementById('facCameraWrap').classList.remove('visible');
+}
+
+async function facCapture() {
+  const video  = document.getElementById('facCameraFeed');
+  const canvas = document.getElementById('capture-canvas');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const imageData = canvas.toDataURL('image/jpeg', 0.85);
+
+  stopFacCamera();
+  showFacSpinner('Recognising students…');
+
+  try {
+    const resp = await fetch('/take-attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image:     imageData,
+        camera_id: ASSIGNED_CAMERA_ID,
+        subject:   CURRENT_SUBJECT,
+        period:    CURRENT_PERIOD_NUM
+      })
+    });
+    const result = await resp.json();
+    hideFacSpinner();
+    if (result.status === 'success') {
+      renderFacResults(result);
+    } else {
+      toast('Recognition failed: ' + (result.message || 'Unknown error'), 'error');
+      resetFacActionZone();
+    }
+  } catch (err) {
+    hideFacSpinner();
+    toast('Network error: ' + err.message, 'error');
+    resetFacActionZone();
+  }
+}
+
+function renderFacResults(result) {
+  const present     = result.present || [];
+  _facPresentNames  = new Set(present.map(n => n.replace(/_/g, ' ')));
+  _facAbsentList    = result.absent_students || [];
+  const pCount      = present.length;
+  const aCount      = _facAbsentList.length;
+
+  const banner = document.getElementById('facResultBanner');
+  banner.className = 'fac-result-banner' + (aCount > 0 ? ' has-absent' : '');
+  document.getElementById('facStatPresent').textContent = `✅ ${pCount} Present`;
+  document.getElementById('facStatAbsent').textContent  = `⚠️ ${aCount} Absent`;
+
+  // Absent list
+  const absentList = document.getElementById('facAbsentList');
+  const absentRows = document.getElementById('facAbsentRows');
+  if (aCount > 0) {
+    absentRows.innerHTML = _facAbsentList.map(s => {
+      const name = s.name || s;
+      return `<div class="fac-absent-row">
+        <span>${name}</span>
+        <button class="fac-mark-present" data-name="${name}">✅ Mark Present</button>
+      </div>`;
+    }).join('');
+    absentRows.querySelectorAll('.fac-mark-present').forEach(btn => {
+      btn.addEventListener('click', () => facMarkPresent(btn.dataset.name, btn));
+    });
+    absentList.style.display = 'block';
+  } else {
+    absentList.style.display = 'none';
+  }
+
+  document.getElementById('facResults').classList.add('visible');
+  document.getElementById('facConfirmBar').classList.add('visible');
+  document.getElementById('facStatusPill').textContent = 'Ready to Submit';
+  document.getElementById('facStatusPill').className = 'fac-status-pill';
+  document.getElementById('facActionZone').style.display = 'none';
+}
+
+async function facMarkPresent(studentName, btn) {
+  showFacSpinner('Updating…');
+  try {
+    await fetch('/api/attendance/override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_name: studentName, status: 'present', camera_id: ASSIGNED_CAMERA_ID })
+    });
+    hideFacSpinner();
+    const row = btn ? btn.closest('.fac-absent-row') : null;
+    if (row) row.remove();
+    _facPresentNames.add(studentName);
+    toast('Marked present: ' + studentName, 'success');
+  } catch {
+    hideFacSpinner();
+    toast('Override failed', 'error');
+  }
+}
+
+async function facConfirmSubmit() {
+  const btn = document.getElementById('btnFacConfirm');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  showFacSpinner('Finalising attendance…');
+  try {
+    const resp = await fetch('/api/attendance/finalize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ camera_id: ASSIGNED_CAMERA_ID, subject: CURRENT_SUBJECT, period: CURRENT_PERIOD_NUM })
+    });
+    const data = await resp.json();
+    hideFacSpinner();
+    if (data.ok) {
+      btn.textContent = '✔ Submitted!';
+      toast('Attendance submitted! ✅', 'success');
+      document.getElementById('facStatusPill').textContent = 'Submitted ✓';
+      document.getElementById('facStatusPill').className = 'fac-status-pill';
+    } else {
+      btn.disabled = false; btn.textContent = '✔ Confirm & Submit Attendance';
+      toast('Submit failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    hideFacSpinner();
+    btn.disabled = false; btn.textContent = '✔ Confirm & Submit Attendance';
+    toast('Network error: ' + err.message, 'error');
+  }
+}
+
+// ── Skip ───────────────────────────────────────────────────────────────────
+function showSkipConfirm() {
+  document.getElementById('facSkipConfirm').classList.add('visible');
+}
+function hideSkipConfirm() {
+  document.getElementById('facSkipConfirm').classList.remove('visible');
+}
+async function confirmSkip() {
+  hideSkipConfirm();
+  showFacSpinner('Logging skip…');
+  try {
+    await fetch('/api/attendance/skip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ camera_id: ASSIGNED_CAMERA_ID, subject: CURRENT_SUBJECT, period: CURRENT_PERIOD_NUM, reason: 'faculty_skipped' })
+    });
+  } catch { /* non-critical */ }
+  hideFacSpinner();
+  toast('Session skipped and logged.', 'info');
+  document.getElementById('facStatusPill').textContent = 'Session Skipped';
+  document.getElementById('facStatusPill').className = 'fac-status-pill idle';
+}
+
+// ── Manual Add ─────────────────────────────────────────────────────────────
+function showFacManualAdd() {
+  const overlay = document.getElementById('facManualOverlay');
+  overlay.classList.add('visible');
+  fetch('/api/faculty/cameras')
+    .then(r => r.json())
+    .then(data => { _facAllStudents = data.students || []; renderFacManualItems(_facAllStudents); })
+    .catch(() => { _facAllStudents = _facAbsentList.map(s => ({ name: s.name || s })); renderFacManualItems(_facAllStudents); });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('visible'); }, { once: true });
+}
+function filterFacManual() {
+  const q = document.getElementById('facManualSearch').value.toLowerCase();
+  renderFacManualItems(_facAllStudents.filter(s => (s.name||s).toLowerCase().includes(q)));
+}
+function renderFacManualItems(students) {
+  const el = document.getElementById('facManualResults');
+  el.innerHTML = students.map(s => {
+    const name = s.name || s;
+    return `<div class="fac-manual-item" data-name="${name}">${name}</div>`;
+  }).join('');
+  el.querySelectorAll('.fac-manual-item').forEach(item => {
+    item.addEventListener('click', () => {
+      facMarkPresent(item.dataset.name, null);
+      document.getElementById('facManualOverlay').classList.remove('visible');
+    });
+  });
+}
+
+// ── Spinner ────────────────────────────────────────────────────────────────
+function showFacSpinner(label = 'Processing...') {
+  document.getElementById('facSpinnerLabel').textContent = label;
+  document.getElementById('facSpinner').classList.add('visible');
+}
+function hideFacSpinner() {
+  document.getElementById('facSpinner').classList.remove('visible');
+}
+function resetFacActionZone() {
+  document.getElementById('facActionZone').style.display = 'flex';
+  document.getElementById('facStatusPill').textContent = 'Idle';
+  document.getElementById('facStatusPill').className = 'fac-status-pill idle';
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ██████████  ADMIN VIEW
+═══════════════════════════════════════════════════════════════════════════ */
+
+let currentSection  = 'dashboard';
+let webcamStream    = null;
+let enrollAngles    = { front: false, left: false, right: false };
+let currentAngleIdx = 0;
+const ANGLE_ORDER   = ['front', 'left', 'right'];
+const ANGLE_LABELS  = { front: '😐 Look STRAIGHT at the camera', left: '👈 Turn head slightly LEFT', right: '👉 Turn head slightly RIGHT' };
+let currentEnrollName = '';
+let allStudentsData   = [];
+let streamActive      = false;
+let lastAnnotatedSrc  = '';
+
+// ── Admin Init ─────────────────────────────────────────────────────────────
+function initAdminView() {
+  document.body.classList.add('admin-layout');
+  document.getElementById('admin-view').style.display = 'block';
+  const userEl = document.getElementById('topbarUser');
+  if (userEl) userEl.textContent = FACULTY_NAME || '';
+  loadStatus();
+  loadDashboard();
+  loadCameraGrid();
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const sec = document.getElementById('sec-' + id);
+  const nav = document.getElementById('nav-' + id);
+  if (sec) sec.classList.add('active');
+  if (nav) nav.classList.add('active');
+  currentSection = id;
+  const titles = {
+    dashboard: 'Dashboard', attendance: 'Take Attendance', enroll: 'Enroll Student',
+    students: 'Students', history: 'Attendance Log', reports: 'Reports',
+    faculty: 'Faculty Management', settings: 'Settings'
+  };
+  document.getElementById('pageTitle').textContent = titles[id] || id;
+  if (id === 'students')  loadStudents();
+  if (id === 'history')   loadTodayAttendance();
+  if (id === 'reports')   loadReports();
+  if (id === 'settings')  loadSettings();
+  if (id === 'dashboard') loadDashboard();
+  if (id === 'faculty')   loadFacultyManagement();
+  stopStream();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  document.querySelector('.layout').classList.toggle('sidebar-collapsed');
+}
+
+// ── Status ──────────────────────────────────────────────────────────────────
 async function loadStatus() {
   try {
     const d = await (await fetch('/api/status')).json();
-    // Sidebar dot
     document.getElementById('sdot').className = 'status-dot online';
     document.getElementById('sstatusText').textContent = `${d.students_enrolled} students`;
-    // Creds badge
     const cb = document.getElementById('credsBadge');
-    cb.textContent   = d.credentials_ok ? '🟢' : '🔴';
-    cb.title         = d.credentials_ok ? 'Google Sheets connected' : 'credentials.json missing';
-    // System status panel
+    cb.textContent = d.credentials_ok ? '🟢' : '🔴';
+    cb.title       = d.credentials_ok ? 'Google Sheets connected' : 'credentials.json missing';
     document.getElementById('ss-camera').innerHTML  = `<span class="badge blue">${d.camera_mode}</span>`;
     document.getElementById('ss-sheets').innerHTML  = d.credentials_ok
       ? '<span class="badge green">Connected</span>'
@@ -601,10 +1719,8 @@ async function loadStatus() {
     document.getElementById('ss-enc').textContent   = `${d.encodings_loaded} encoding(s)`;
     document.getElementById('ss-tol').textContent   = d.tolerance;
     document.getElementById('ss-time').textContent  = '16:00:00';
-    // Dashboard stats
     document.getElementById('d-enrolled').textContent  = d.students_enrolled;
     document.getElementById('d-encodings').textContent = d.encodings_loaded;
-    // Creds panel in settings
     const cd = document.getElementById('credsStatus');
     if (cd) {
       cd.innerHTML = d.credentials_ok
@@ -618,12 +1734,9 @@ async function loadStatus() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  DASHBOARD
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Dashboard ───────────────────────────────────────────────────────────────
 async function loadDashboard() {
   await loadStatus();
-  // Try to load today's attendance for present/absent counts
   try {
     const d = await (await fetch('/api/attendance/today')).json();
     if (d.status === 'success' && d.records.length > 0) {
@@ -632,12 +1745,16 @@ async function loadDashboard() {
       document.getElementById('d-present').textContent = present;
       document.getElementById('d-absent').textContent  = absent;
     }
-  } catch { /* no creds — skip */ }
+  } catch { /* no creds */ }
+  // Faculty count
+  try {
+    const d = await (await fetch('/api/admin/users')).json();
+    const facCount = (d.users || []).filter(u => u.role === 'faculty').length;
+    document.getElementById('d-faculty').textContent = facCount;
+  } catch { document.getElementById('d-faculty').textContent = '—'; }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  ATTENDANCE CAPTURE
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Attendance Capture ──────────────────────────────────────────────────────
 function switchTab(tab) {
   ['cam','upload','stream'].forEach(t => {
     document.getElementById(`atab-${t}`).style.display = t === tab ? 'block' : 'none';
@@ -653,16 +1770,14 @@ async function triggerCamera(camId) {
   try {
     const body = selectedCam ? JSON.stringify({ camera_id: selectedCam }) : JSON.stringify({});
     const d = await (await fetch('/take-attendance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body
     })).json();
     hideLoading();
     if (d.status === 'success') {
       showAttendanceResults(d);
-      if (!d.sheet_synced) toast('Attendance taken ✓ (Google Sheets not synced — log in at /auth/google)', 'warn');
-      else toast(`Attendance recorded: ${d.present.length} present (Boys:${d.boys_count||0} Girls:${d.girls_count||0})`, 'success');
-      loadCameraGrid();  // refresh camera grid counts
+      if (!d.sheet_synced) toast('Attendance taken ✓ (Google Sheets not synced)', 'warn');
+      else toast(`Attendance recorded: ${d.present.length} present`, 'success');
+      loadCameraGrid();
     } else {
       toast(`Error: ${d.message}`, 'error');
     }
@@ -701,13 +1816,11 @@ function showAttendanceResults(d) {
     <div class="name-chips">
       ${present.length ? present.map(n => `<div class="chip green-chip">✓ ${n.replace(/_/g,' ')}</div>`).join('') : '<p class="muted">No students recognized.</p>'}
     </div>`;
-  // Show annotated image
   if (d.annotated_img) {
     lastAnnotatedSrc = d.annotated_img + '?t=' + Date.now();
     document.getElementById('annotatedImg').src = lastAnnotatedSrc;
     document.getElementById('annotatedPanel').style.display = 'block';
   }
-  // Update dashboard too
   document.getElementById('d-present').textContent = present.length;
 }
 
@@ -717,7 +1830,6 @@ function downloadAnnotated() {
   a.download = 'attendance_' + Date.now() + '.jpg'; a.click();
 }
 
-// ── Camera Stream ──────────────────────────────────────────────────────────
 function startStream() {
   streamActive = true;
   document.getElementById('streamImg').src = '/api/camera/stream';
@@ -734,9 +1846,7 @@ function stopStream() {
   if (bst) bst.style.display = 'none';
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  ENROLLMENT
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Enrollment ──────────────────────────────────────────────────────────────
 function switchEnrollTab(tab) {
   document.getElementById('etab-webcam').style.display = tab === 'webcam' ? 'block' : 'none';
   document.getElementById('etab-upload').style.display = tab === 'upload' ? 'block' : 'none';
@@ -750,13 +1860,11 @@ function validateEnrollForm() {
   document.getElementById('btnStartWebcam').disabled = !name;
 }
 
-// ── Webcam Enrollment ──────────────────────────────────────────────────────
 async function startWebcamEnroll() {
   const name = document.getElementById('ewName').value.trim();
   if (!name) { toast('Please enter student name first', 'warn'); return; }
-  currentEnrollName  = name;
-  currentAngleIdx    = 0;
-  enrollAngles       = { front: false, left: false, right: false };
+  currentEnrollName = name; currentAngleIdx = 0;
+  enrollAngles = { front: false, left: false, right: false };
   resetAngleSteps();
   try {
     webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width:640, height:480 } });
@@ -778,8 +1886,8 @@ function stopWebcamEnroll() {
 }
 
 function updateAngleUI() {
-  const angle  = ANGLE_ORDER[currentAngleIdx];
-  const pct    = (currentAngleIdx / 3) * 100;
+  const angle = ANGLE_ORDER[currentAngleIdx];
+  const pct   = (currentAngleIdx / 3) * 100;
   document.getElementById('ewProgressBar').style.width = pct + '%';
   document.getElementById('enrollAngleTitle').textContent = `Step ${currentAngleIdx+1} of 3 — ${ANGLE_LABELS[angle]}`;
   ANGLE_ORDER.forEach((a, i) => {
@@ -800,26 +1908,19 @@ function resetAngleSteps() {
 async function captureAngle() {
   const angle = ANGLE_ORDER[currentAngleIdx];
   const name  = currentEnrollName.replace(/\s+/g, '_');
-  const v     = document.getElementById('ewVideo');
-  const c     = document.getElementById('ewCanvas');
+  const v = document.getElementById('ewVideo');
+  const c = document.getElementById('ewCanvas');
   c.width = v.videoWidth; c.height = v.videoHeight;
   c.getContext('2d').drawImage(v, 0, 0);
   const b64 = c.toDataURL('image/jpeg', 0.85);
   document.getElementById('btnCapture').disabled = true;
   try {
     const res = await fetch('/api/enroll/webcam', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, angle, image: b64,
-        email: document.getElementById('ewEmail').value,
-        gender: document.getElementById('ewGender').value || 'M'
-      })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, angle, image: b64, email: document.getElementById('ewEmail').value, gender: document.getElementById('ewGender').value || 'M' })
     });
     const d = await res.json();
-    if (d.status === 'no_face') {
-      toast(d.message, 'warn'); return;
-    }
+    if (d.status === 'no_face') { toast(d.message, 'warn'); return; }
     enrollAngles[angle] = true;
     document.getElementById(`as-${angle}`).textContent = '✓ Done';
     document.getElementById(`astep-${angle}`).classList.add('done');
@@ -844,11 +1945,8 @@ async function finalizeEnrollment() {
   showLoading('Finalizing enrollment...', 'Saving face data to memory');
   try {
     const res = await fetch('/api/enroll/webcam', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, angle: '', image: '', email,
-        gender: document.getElementById('ewGender').value || 'M',
-        finalize: true })
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, angle: '', image: '', email, gender: document.getElementById('ewGender').value || 'M', finalize: true })
     });
     const d = await res.json();
     hideLoading();
@@ -863,7 +1961,6 @@ async function finalizeEnrollment() {
   } catch(e) { hideLoading(); toast('Error: ' + e.message, 'error'); }
 }
 
-// ── Upload Enrollment ──────────────────────────────────────────────────────
 function previewUploadPhotos(input) {
   const prev = document.getElementById('euPreviews');
   prev.innerHTML = '';
@@ -882,12 +1979,11 @@ async function enrollViaUpload() {
   const name  = document.getElementById('euName').value.trim();
   const email = document.getElementById('euEmail').value.trim();
   const files = document.getElementById('euPhotos').files;
-  if (!name)  { toast('Student name is required', 'warn'); return; }
+  if (!name)         { toast('Student name is required', 'warn'); return; }
   if (!files.length) { toast('Please select at least one photo', 'warn'); return; }
   showLoading('Enrolling student...', 'Detecting and encoding faces');
   const fd = new FormData();
-  fd.append('name', name);
-  fd.append('email', email);
+  fd.append('name', name); fd.append('email', email);
   fd.append('gender', document.getElementById('euGender').value || 'M');
   Array.from(files).slice(0,3).forEach(f => fd.append('photos', f));
   try {
@@ -895,7 +1991,7 @@ async function enrollViaUpload() {
     hideLoading();
     if (d.status === 'success') {
       toast(d.message, 'success');
-      document.getElementById('euName').value  = '';
+      document.getElementById('euName').value = '';
       document.getElementById('euEmail').value = '';
       document.getElementById('euPhotos').value = '';
       document.getElementById('euPreviews').innerHTML = '';
@@ -905,9 +2001,7 @@ async function enrollViaUpload() {
   } catch(e) { hideLoading(); toast('Error: ' + e.message, 'error'); }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  STUDENTS LIST
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Students List ───────────────────────────────────────────────────────────
 async function loadStudents() {
   const grid = document.getElementById('studentGrid');
   grid.innerHTML = '<div class="loading-inline"><div class="spinner-sm"></div> Loading students...</div>';
@@ -958,9 +2052,7 @@ function deleteStudent(name, display) {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  ATTENDANCE LOG
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Attendance Log ──────────────────────────────────────────────────────────
 let attendanceRecords = [];
 
 async function loadTodayAttendance() {
@@ -1012,9 +2104,7 @@ function exportCSV() {
   toast('CSV exported', 'success');
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  REPORTS
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Reports ─────────────────────────────────────────────────────────────────
 async function loadReports() {
   const el = document.getElementById('reportsContent');
   el.innerHTML = '<div class="loading-inline"><div class="spinner-sm"></div> Generating report...</div>';
@@ -1058,9 +2148,7 @@ async function loadReports() {
   } catch(e) { el.innerHTML = `<div class="error-bar">❌ ${e.message}</div>`; }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  SETTINGS
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Settings ────────────────────────────────────────────────────────────────
 async function loadSettings() {
   await loadStatus();
   try {
@@ -1076,10 +2164,6 @@ async function loadSettings() {
   } catch { /* ignore */ }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════════════════════
-
 async function saveSettings() {
   const btn = document.getElementById('btnSaveSettings');
   if (btn) btn.disabled = true;
@@ -1093,9 +2177,7 @@ async function saveSettings() {
       voice_phrase: document.getElementById('setVoicePhrase').value.trim(),
     };
     const d = await (await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     })).json();
     if (d.status === 'success') toast(d.message, 'success');
     else toast('Save failed: ' + d.message, 'error');
@@ -1103,12 +2185,233 @@ async function saveSettings() {
   if (btn) btn.disabled = false;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  FACULTY MANAGEMENT (Admin)
+// ═══════════════════════════════════════════════════════════════════════════
+let _allFacultyData = [];
 
-loadStatus();
-loadDashboard();
+async function loadFacultyManagement() {
+  const tbody = document.getElementById('facultyTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--text-secondary);"><div class="spinner-sm" style="display:inline-block;margin-right:8px;"></div>Loading...</td></tr>';
+  try {
+    const d = await (await fetch('/api/admin/users')).json();
+    const faculty = (d.users || []).filter(u => u.role === 'faculty');
+    _allFacultyData = faculty;
+    renderFacultyTable(faculty);
+    // Update stats
+    const all   = d.users || [];
+    const facs  = all.filter(u => u.role === 'faculty');
+    const locked = facs.filter(u => u.is_locked);
+    const active = facs.filter(u => u.is_active && !u.is_locked);
+    document.getElementById('fms-total').textContent  = facs.length;
+    document.getElementById('fms-active').textContent = active.length;
+    document.getElementById('fms-locked').textContent = locked.length;
+    document.getElementById('d-faculty').textContent  = facs.length;
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--accent-red);">❌ Failed to load: ${e.message}</td></tr>`;
+  }
+}
+
+function renderFacultyTable(faculty) {
+  const tbody = document.getElementById('facultyTableBody');
+  if (!faculty.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-secondary);padding:2rem;">No faculty members yet. Click <strong>+ Add Faculty</strong> to create one.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = faculty.map(u => {
+    const initial = (u.full_name || 'F').charAt(0).toUpperCase();
+    const statusBadge = u.is_locked
+      ? '<span class="badge" style="background:rgba(248,81,73,.15);color:#f87171;border:1px solid rgba(248,81,73,.3);">🔒 Locked</span>'
+      : u.is_active
+        ? '<span class="badge" style="background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3);">● Active</span>'
+        : '<span class="badge" style="background:rgba(148,163,184,.1);color:#8b949e;">Inactive</span>';
+    const cameras = (() => {
+      try {
+        const cams = JSON.parse(u.assigned_cameras || '[]');
+        return cams.length ? cams.map(c => `<span class="cam-chip">${c}</span>`).join('') : '<span style="color:var(--text-muted);font-size:.72rem;">—</span>';
+      } catch { return '—'; }
+    })();
+    const lastLogin = u.last_login ? u.last_login.slice(0,16).replace('T',' ') : 'Never';
+    const unlockBtn = u.is_locked ? `<button class="btn btn-sm" onclick="facUnlock('${u.user_id}')">🔓 Unlock</button>` : '';
+    const deactBtn  = u.is_active ? `<button class="btn btn-sm btn-danger" onclick="facDeactivate('${u.user_id}')">Deactivate</button>` : '';
+    return `<tr>
+      <td>
+        <div class="faculty-name-cell">
+          <div class="faculty-avatar">${initial}</div>
+          <div class="faculty-name-info">
+            <div class="fn">${u.full_name}</div>
+            <div class="fi">${u.email || '—'}</div>
+          </div>
+        </div>
+      </td>
+      <td><code style="font-size:.75rem;color:#7ab3ff;">${u.user_id}</code></td>
+      <td style="color:var(--text-secondary);font-size:.78rem;">${u.email || '—'}</td>
+      <td>${statusBadge}</td>
+      <td>${cameras}</td>
+      <td style="color:var(--text-secondary);font-size:.72rem;">${lastLogin}</td>
+      <td>
+        <div class="action-row">
+          ${unlockBtn}
+          ${deactBtn}
+          <button class="btn btn-sm" onclick="openResetModal('${u.user_id}','${u.full_name}')">🔑 Reset Pwd</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterFaculty() {
+  const q = document.getElementById('facultySearch').value.toLowerCase();
+  renderFacultyTable(_allFacultyData.filter(u =>
+    u.full_name.toLowerCase().includes(q) ||
+    u.user_id.toLowerCase().includes(q)   ||
+    (u.email || '').toLowerCase().includes(q)
+  ));
+}
+
+// ── Faculty Modal ───────────────────────────────────────────────────────────
+async function openFacModal() {
+  // Reset form
+  ['fm-name','fm-id','fm-dept','fm-email','fm-pwd'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('facModalFlash').className = 'fac-modal-flash';
+  document.getElementById('facCredBox').classList.remove('visible');
+  document.getElementById('btnCreateFaculty').style.display = 'inline-flex';
+
+  // Load cameras into select
+  const camSel = document.getElementById('fm-camera');
+  camSel.innerHTML = '<option value="">— None assigned yet —</option>';
+  try {
+    const d = await (await fetch('/api/cameras')).json();
+    (d.cameras || []).forEach(cam => {
+      const opt = document.createElement('option');
+      opt.value = cam.id;
+      opt.textContent = cam.display_name || cam.sheet_name || cam.id;
+      camSel.appendChild(opt);
+    });
+  } catch { /* no cameras */ }
+
+  // Auto-suggest next ID
+  try {
+    const d = await (await fetch('/api/admin/next-faculty-id')).json();
+    if (d.next_id) document.getElementById('fm-id').placeholder = d.next_id + ' (auto)';
+  } catch { /* ignore */ }
+
+  document.getElementById('facModal').classList.add('open');
+}
+
+function closeFacModal() {
+  document.getElementById('facModal').classList.remove('open');
+  // Refresh table if something was created
+  if (document.getElementById('facCredBox').classList.contains('visible')) {
+    loadFacultyManagement();
+  }
+}
+
+async function createFaculty() {
+  const name   = document.getElementById('fm-name').value.trim();
+  const uid    = document.getElementById('fm-id').value.trim();
+  const email  = document.getElementById('fm-email').value.trim();
+  const pwd    = document.getElementById('fm-pwd').value;
+  const camera = document.getElementById('fm-camera').value;
+  const dept   = document.getElementById('fm-dept').value.trim();
+
+  const flash = document.getElementById('facModalFlash');
+  flash.className = 'fac-modal-flash';
+
+  if (!name) { flash.className = 'fac-modal-flash error'; flash.textContent = 'Full name is required.'; return; }
+  if (!pwd || pwd.length < 8) { flash.className = 'fac-modal-flash error'; flash.textContent = 'Password must be at least 8 characters.'; return; }
+
+  const btn = document.getElementById('btnCreateFaculty');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  try {
+    const body = {
+      full_name: name,
+      role: 'faculty',
+      email,
+      password: pwd,
+      must_change_password: true,
+      assigned_cameras: camera ? [camera] : [],
+    };
+    if (uid) body.user_id = uid;
+    if (dept) body.department = dept;
+
+    const res  = await fetch('/api/admin/users/create', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      const createdId = data.user_id || uid || '—';
+      // Show credentials
+      document.getElementById('credId').childNodes[0].textContent  = createdId + ' ';
+      document.getElementById('credPwd').childNodes[0].textContent = pwd + ' ';
+      document.getElementById('facCredBox').classList.add('visible');
+      flash.className  = 'fac-modal-flash success';
+      flash.textContent = `✅ ${name} created successfully!`;
+      btn.style.display = 'none';
+      toast(`Faculty ${name} (${createdId}) created`, 'success');
+      loadFacultyManagement();
+    } else {
+      flash.className  = 'fac-modal-flash error';
+      flash.textContent = data.message || 'Creation failed.';
+      btn.disabled = false; btn.textContent = 'Create Faculty';
+    }
+  } catch(e) {
+    flash.className  = 'fac-modal-flash error';
+    flash.textContent = 'Network error: ' + e.message;
+    btn.disabled = false; btn.textContent = 'Create Faculty';
+  }
+}
+
+// ── Copy helper ─────────────────────────────────────────────────────────────
+function copyText(el) {
+  const text = el.childNodes[0]?.textContent?.trim() || '';
+  navigator.clipboard?.writeText(text).then(() => toast('Copied!', 'success', 1500)).catch(() => {});
+}
+
+// ── Faculty Actions ─────────────────────────────────────────────────────────
+async function facUnlock(uid) {
+  const res = await fetch(`/api/admin/users/${uid}/unlock`, { method: 'POST' });
+  const d   = await res.json();
+  toast(d.message, d.status === 'success' ? 'success' : 'error');
+  if (d.status === 'success') loadFacultyManagement();
+}
+
+async function facDeactivate(uid) {
+  if (!window.confirm(`Deactivate ${uid}? They will be logged out immediately.`)) return;
+  const res = await fetch(`/api/admin/users/${uid}/deactivate`, { method: 'POST' });
+  const d   = await res.json();
+  toast(d.message, d.status === 'success' ? 'success' : 'error');
+  if (d.status === 'success') loadFacultyManagement();
+}
+
+// ── Reset Password Modal ─────────────────────────────────────────────────────
+let _resetUid = '';
+function openResetModal(uid, name) {
+  _resetUid = uid;
+  document.getElementById('resetModalFor').textContent = `For: ${name} (${uid})`;
+  document.getElementById('resetPwdInput').value = '';
+  document.getElementById('resetModal').classList.add('open');
+}
+function closeResetModal() {
+  document.getElementById('resetModal').classList.remove('open');
+}
+async function doResetPwd() {
+  const pwd = document.getElementById('resetPwdInput').value;
+  if (!pwd || pwd.length < 8) { toast('Password must be at least 8 characters', 'warn'); return; }
+  const res = await fetch(`/api/admin/users/${_resetUid}/reset-password`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd })
+  });
+  const d = await res.json();
+  toast(d.message, d.status === 'success' ? 'success' : 'error');
+  if (d.status === 'success') closeResetModal();
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  CAMERA GRID (dashboard)
+//  CAMERA GRID
 // ═══════════════════════════════════════════════════════════════════════════
 async function loadCameraGrid() {
   try {
@@ -1116,29 +2419,24 @@ async function loadCameraGrid() {
     const grid  = document.getElementById('cameraGrid');
     const empty = document.getElementById('cameraGridEmpty');
     if (!d.cameras || d.cameras.length === 0) {
-      grid.innerHTML = '';
-      grid.appendChild(empty);
-      return;
+      grid.innerHTML = ''; grid.appendChild(empty); return;
     }
     grid.innerHTML = d.cameras.map(cam => `
       <div class="panel" style="padding:1.25rem;gap:.75rem;display:flex;flex-direction:column;" id="camcard_${cam.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
           <div>
             <div style="font-weight:600;font-size:.95rem;">${cam.display_name || cam.sheet_name}</div>
-            <div style="font-size:.72rem;color:var(--muted);font-family:monospace;margin-top:2px;">${cam.sheet_name}</div>
+            <div style="font-size:.72rem;color:var(--text-secondary);font-family:monospace;margin-top:2px;">${cam.sheet_name}</div>
           </div>
           <span class="badge blue" id="camstatus_${cam.id}" style="font-size:.7rem;">—</span>
         </div>
-        <div style="font-size:.78rem;color:var(--muted);">${cam.rtsp_url ? '📡 ' + cam.rtsp_url : '⚠️ No URL configured'}</div>
-        <button class="btn btn-primary" style="font-size:.85rem;padding:.6rem 1rem;"
-          onclick="triggerCamera('${cam.id}')">📸 Take Attendance</button>
+        <div style="font-size:.78rem;color:var(--text-secondary);">${cam.rtsp_url ? '📡 ' + cam.rtsp_url : '⚠️ No URL configured'}</div>
+        <button class="btn btn-primary" style="font-size:.85rem;padding:.6rem 1rem;" onclick="triggerCamera('${cam.id}')">📸 Take Attendance</button>
       </div>
     `).join('');
 
-    // Populate camera select in attendance tab
     populateCameraSelect(d.cameras);
 
-    // Ping each camera status
     d.cameras.forEach(async cam => {
       try {
         const s = await (await fetch(`/api/cameras/${cam.id}/status`)).json();
@@ -1150,15 +2448,12 @@ async function loadCameraGrid() {
         }
       } catch {}
     });
-  } catch(e) {
-    console.warn('loadCameraGrid error:', e);
-  }
+  } catch(e) { console.warn('loadCameraGrid error:', e); }
 }
 
 function populateCameraSelect(cameras) {
   const sel = document.getElementById('atCameraSelect');
   if (!sel) return;
-  // Keep default option, remove rest
   while (sel.options.length > 1) sel.remove(1);
   cameras.forEach(cam => {
     const opt = document.createElement('option');
@@ -1179,17 +2474,14 @@ async function takeAllAttendance() {
     for (const cam of cameras) {
       try {
         const r = await (await fetch('/take-attendance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ camera_id: cam.id })
         })).json();
         if (r.status === 'success') {
           successCount++;
           toast(`✓ ${cam.display_name || cam.id}: ${r.present.length} present`, 'success', 6000);
         }
-      } catch(e) {
-        toast(`✗ ${cam.display_name || cam.id}: ${e.message}`, 'error');
-      }
+      } catch(e) { toast(`✗ ${cam.display_name || cam.id}: ${e.message}`, 'error'); }
     }
     loadCameraGrid();
     toast(`All attendance done: ${successCount}/${cameras.length} cameras`, 'info');
@@ -1197,9 +2489,17 @@ async function takeAllAttendance() {
   if (btn) { btn.disabled = false; btn.textContent = '⚡ All Cameras'; }
 }
 
-// Load camera grid on startup
-loadCameraGrid();
+</script>
 
+<!-- ══ SERVICE WORKER ════════════════════════════════════════════════════════ -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.error('SW registration error:', err));
+  });
+}
 </script>
 </body>
 </html>
